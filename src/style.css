@@ -1,0 +1,25 @@
+:root {
+  font-family: 'Noto Sans JP', sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #545454;
+  background-color: #c1d0e8;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #c1d0e8;
+}
+
+#app {
+  min-height: 100vh;
+}

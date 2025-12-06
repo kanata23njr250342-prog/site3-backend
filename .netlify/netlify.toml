@@ -1,0 +1,58 @@
+functionsDirectory = "/Users/kanataM/Downloads/site3/netlify/functions"
+functionsDirectoryOrigin = "config-v1"
+headersOrigin = "config"
+redirectsOrigin = "config"
+plugins = []
+
+[build]
+publish = "/Users/kanataM/Downloads/site3/dist"
+publishOrigin = "config"
+commandOrigin = "config"
+command = "npm run build"
+functions = "/Users/kanataM/Downloads/site3/netlify/functions"
+
+[build.environment]
+
+[build.processing]
+
+[build.processing.css]
+
+[build.processing.html]
+
+[build.processing.images]
+
+[build.processing.js]
+
+[build.services]
+
+[dev]
+functions = "netlify/functions"
+
+[env]
+
+[env.production]
+
+[[env.production.env_vars]]
+NETLIFY_KV_ENABLED = "true"
+
+[functions]
+
+[functions."*"]
+
+[[headers]]
+for = "/.netlify/uploads/*"
+
+[headers.values]
+Cache-Control = "public, max-age=31536000"
+
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
