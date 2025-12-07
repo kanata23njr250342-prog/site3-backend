@@ -77,6 +77,17 @@ const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value
 }
 
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return date.toLocaleString('ja-JP', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
 const handlePostClick = (post) => {
   emit('view-post', post)
 }
@@ -153,7 +164,10 @@ const contentStyle = computed(() => ({
           @click="handlePostClick(post)"
           @contextmenu="handleContextMenu(post.id, post.isOwn, $event)"
         >
-          <span class="post-title">{{ post.title }}</span>
+          <div class="post-info">
+            <span class="post-title">{{ post.title }}</span>
+            <span class="post-date">{{ formatDate(post.createdat) }}</span>
+          </div>
           <div v-if="post.isOwn" class="post-actions">
             <button
               class="action-btn edit-btn"
@@ -288,6 +302,15 @@ const contentStyle = computed(() => ({
   border-left-color: #4a7ba7;
 }
 
+.post-info {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .post-title {
   flex: 1;
   font-size: 0.9rem;
@@ -296,6 +319,13 @@ const contentStyle = computed(() => ({
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.post-date {
+  font-size: 0.75rem;
+  color: #999;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .post-actions {
