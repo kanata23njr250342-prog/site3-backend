@@ -1,12 +1,25 @@
 /**
  * Netlify Functions用のデータベース管理
- * メモリ上でデータを保持（本番環境ではデータベースサービスの使用を推奨）
+ * メモリ上でデータを保持
+ * 注: Netlify Functionsは各リクエストで新しいプロセスが起動されるため、
+ * 本番環境ではNetlify Blobs、Supabase、DynamoDBなどの外部DBサービスの使用を推奨
  */
 
+// グローバルメモリにデータを保持（同一プロセス内での共有用）
 let dbData = {
   notes: [],
   posts: [],
   version: '2.0'
+}
+
+// 初期データをロード（開発環境用）
+function initializeDb() {
+  // 既にデータがある場合はスキップ
+  if (dbData.posts.length > 0 || dbData.notes.length > 0) {
+    return
+  }
+  
+  // 初期データ（必要に応じて追加）
 }
 
 /**
