@@ -82,11 +82,30 @@ export default async (req, context) => {
     const now = new Date().toISOString()
     const postId = Date.now().toString()
 
+    // ファイル拡張子からMIMEタイプを判定
+    const getMimeType = (fileName) => {
+      const ext = fileName.toLowerCase().split('.').pop()
+      const mimeTypes = {
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mov': 'video/quicktime'
+      }
+      return mimeTypes[ext] || 'application/octet-stream'
+    }
+
+    const mimeType = getMimeType(fileName)
+    const dataUrl = `data:${mimeType};base64,${fileData}`
+
     const post = {
       id: postId,
       title,
       category,
-      src: fileData, // Base64形式で保存
+      src: dataUrl, // data:URLで保存
       fileName,
       authorId,
       createdAt: now,
@@ -96,8 +115,8 @@ export default async (req, context) => {
     db.addPost(post)
 
     return new Response(JSON.stringify({
-      ...post,
-      src: `data:image/png;base64,${fileData.substring(0, 100)}...` // プレビュー用
+      ...post
+      // srcはフロントエンドで表示するために完全なdata:URLを返す
     }), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }
