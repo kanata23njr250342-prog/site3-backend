@@ -6,7 +6,8 @@ export default async (req, context) => {
   }
 
   try {
-    const category = context.params.category
+    const url = new URL(req.url)
+    const category = url.searchParams.get('category')
     
     if (!category) {
       return new Response(JSON.stringify({ error: 'Category is required' }), {

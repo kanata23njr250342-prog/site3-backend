@@ -6,7 +6,8 @@ export default async (req, context) => {
   }
 
   try {
-    const id = context.params.id
+    const url = new URL(req.url)
+    const id = url.searchParams.get('id')
     const db = getDb()
 
     const deleted = db.deleteNote(id)

@@ -6,9 +6,46 @@ publish = "dist"
 [dev]
 functions = "netlify/functions"
 
-# APIリダイレクト設定
+# API ルーティング設定
 [[redirects]]
-from = "/api/*"
-to = "/.netlify/functions/:splat"
+from = "/api/notes/:category"
+to = "/.netlify/functions/notes-get"
 status = 200
 force = true
+
+[[redirects]]
+from = "/api/notes"
+to = "/.netlify/functions/notes-post"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/notes/:id"
+to = "/.netlify/functions/notes-put"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/posts/:category"
+to = "/.netlify/functions/posts-get"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/posts"
+to = "/.netlify/functions/posts-post"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/posts/:id"
+to = "/.netlify/functions/posts-put"
+status = 200
+force = true
+
+[[redirects]]
+from = "/api/posts/:id"
+to = "/.netlify/functions/posts-delete"
+status = 200
+force = true
+method = "DELETE"
