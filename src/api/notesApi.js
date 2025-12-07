@@ -72,12 +72,22 @@ export async function createNote(noteData) {
   try {
     console.log('📝 Creating note in Supabase:', noteData)
     
+    // Supabaseのカラムに合わせて必要なフィールドのみを抽出
+    const dataForDB = {
+      category: noteData.category,
+      content: noteData.content,
+      x: noteData.x,
+      y: noteData.y,
+      postid: noteData.postid,
+      isexample: noteData.isexample || false,
+      authorid: getCurrentUserId()
+    }
+    
+    console.log('📤 Sending to Supabase:', dataForDB)
+    
     const { data, error } = await supabase
       .from('notes')
-      .insert([{
-        ...noteData,
-        authorid: getCurrentUserId()
-      }])
+      .insert([dataForDB])
       .select()
 
     if (error) {

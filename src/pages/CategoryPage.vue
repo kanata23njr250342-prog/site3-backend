@@ -434,7 +434,19 @@ const addNote = async () => {
   try {
     const isPostView = currentViewIndex.value !== -1 && currentPost.value
     
-    const noteData = {
+    // Supabaseに送信するデータ（必要なカラムのみ）
+    const noteDataForDB = {
+      category: props.name,
+      x: contextMenu.value.canvasX,
+      y: contextMenu.value.canvasY,
+      content: newNoteForm.value.content.trim(),
+      postid: isPostView ? currentPost.value.id : undefined,
+      isexample: false,
+      authorid: getCurrentUserId()
+    }
+    
+    // フロントエンド用のメモオブジェクト（UI表示用）
+    const noteDataForUI = {
       id: Date.now().toString(),
       category: props.name,
       x: contextMenu.value.canvasX,
@@ -449,18 +461,20 @@ const addNote = async () => {
       isOwn: true,
       postid: isPostView ? currentPost.value.id : undefined,
       isExample: false,
-      migrated: true
+      migrated: true,
+      authorid: getCurrentUserId()
     }
     
     if (isPostView) {
-      const savedNote = await createNote(noteData)
+      const savedNote = await createNote(noteDataForDB)
       notes.value.push({
+        ...noteDataForUI,
         ...savedNote,
         isOwn: true,
         isExample: false
       })
     } else {
-      notes.value.push(noteData)
+      notes.value.push(noteDataForUI)
     }
     
     showNoteDialog.value = false
