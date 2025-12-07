@@ -675,7 +675,7 @@ const deletePost = async (postId) => {
 
 const editPost = (post) => {
   editingPost.value = { ...post }
-  const previewUrl = post.src.startsWith('http') ? post.src : `http://localhost:3000${post.src}`
+  const previewUrl = post.src.startsWith('data:') || post.src.startsWith('http') ? post.src : `http://localhost:3000${post.src}`
   newPostForm.value = { title: post.title, file: null, preview: previewUrl }
   showPostDialog.value = true
 }
@@ -833,14 +833,14 @@ onUnmounted(() => {
 
             <img
               v-if="currentViewIndex !== -1 && name !== 'アニメーション'"
-              :src="`http://localhost:3000${currentPost.src}`"
+              :src="currentPost.src.startsWith('data:') ? currentPost.src : `http://localhost:3000${currentPost.src}`"
               :alt="currentPost.title"
               class="artwork-media"
-              @click="handleImageClick(`http://localhost:3000${currentPost.src}`)"
+              @click="handleImageClick(currentPost.src.startsWith('data:') ? currentPost.src : `http://localhost:3000${currentPost.src}`)"
             />
             <video
               v-else-if="currentViewIndex !== -1 && name === 'アニメーション'"
-              :src="`http://localhost:3000${currentPost.src}`"
+              :src="currentPost.src.startsWith('data:') ? currentPost.src : `http://localhost:3000${currentPost.src}`"
               controls
               class="artwork-media"
             />
