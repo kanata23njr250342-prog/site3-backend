@@ -38,15 +38,19 @@ export async function fetchNotes(category) {
       .from('notes')
       .select('*')
       .eq('category', category)
-      .order('createdAt', { ascending: false })
     
     if (error) {
       console.error('❌ Supabase error:', error)
       throw error
     }
     
-    console.log('✅ Notes fetched:', data?.length || 0)
-    return Array.isArray(data) ? data : []
+    // フロントエンド側でソート（createdAtの降順）
+    const sortedData = Array.isArray(data) ? data.sort((a, b) => 
+      new Date(b.createdAt) - new Date(a.createdAt)
+    ) : []
+    
+    console.log('✅ Notes fetched:', sortedData?.length || 0)
+    return sortedData
   } catch (error) {
     console.error('❌ Error fetching notes:', error)
     throw new Error(getErrorMessage('メモ取得', error))
