@@ -8,7 +8,12 @@ export default async (req, context) => {
   try {
     const url = new URL(req.url)
     const id = url.searchParams.get('id')
-    const body = JSON.parse(req.body)
+    let bodyText = req.body
+    if (typeof bodyText !== 'string') {
+      const buffer = await req.arrayBuffer()
+      bodyText = new TextDecoder().decode(buffer)
+    }
+    const body = JSON.parse(bodyText)
     const { content, author, width, height, x, y } = body
 
     const db = getDb()

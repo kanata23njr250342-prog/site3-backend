@@ -6,7 +6,12 @@ export default async (req, context) => {
   }
 
   try {
-    const body = JSON.parse(req.body)
+    let bodyText = req.body
+    if (typeof bodyText !== 'string') {
+      const buffer = await req.arrayBuffer()
+      bodyText = new TextDecoder().decode(buffer)
+    }
+    const body = JSON.parse(bodyText)
     const { id, category, x, y, width, height, content, author, color, postId, authorId } = body
 
     if (!id || !category || content === undefined || !author || !color) {

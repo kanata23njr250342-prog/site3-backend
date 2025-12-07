@@ -20,15 +20,28 @@ export default async (req, context) => {
 
     if (contentType.includes('application/json')) {
       // JSON形式（Base64エンコードされたファイル）
-      const body = JSON.parse(req.body)
+      let bodyText = req.body
+      
+      // req.bodyがストリームの場合は読み込む
+      if (typeof bodyText !== 'string') {
+        const buffer = await req.arrayBuffer()
+        bodyText = new TextDecoder().decode(buffer)
+      }
+      
+      console.log('📥 Received body:', bodyText.substring(0, 200))
+      
+      const body = JSON.parse(bodyText)
       title = body.title
       category = body.category
       authorId = body.authorId
       fileData = body.fileData // Base64形式
       fileName = body.fileName
+      
+      console.log('✅ Parsed request:', { title, category, fileName, authorId, fileDataLength: fileData?.length })
     } else {
       // FormData形式は Netlify Functions では直接サポートされていないため、
       // フロントエンド側でBase64に変換して送信する必要があります
+      console.error('❌ Invalid content-type:', contentType)
       return new Response(JSON.stringify({ error: 'Please send file as Base64 in JSON format' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -36,6 +49,7 @@ export default async (req, context) => {
     }
 
     if (!title || !category || !fileData || !fileName) {
+      console.error('❌ Missing required fields:', { title, category, fileData: !!fileData, fileName })
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
@@ -43,6 +57,7 @@ export default async (req, context) => {
     }
 
     if (!authorId) {
+      console.error('❌ Author ID is required')
       return new Response(JSON.stringify({ error: 'Author ID is required' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
