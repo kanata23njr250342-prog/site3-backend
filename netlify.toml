@@ -3,6 +3,12 @@ command = "npm run build"
 functions = "netlify/functions"
 publish = "dist"
 
+[build.environment]
+# Supabase environment variables for build time
+# These will be injected into the frontend build
+VITE_SUPABASE_URL = "https://ddkmnuivyvuqqfvktrou.supabase.co"
+VITE_SUPABASE_ANON_KEY = "sb_publishable_RoGIEnAS8977W74YIA5o_g_Ajol_JpW"
+
 [dev]
 functions = "netlify/functions"
 
