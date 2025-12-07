@@ -1,0 +1,3 @@
+[submodule "server"]
+	path = server
+	url = https://github.com/kanata23njr250342-prog/site3-server.git
