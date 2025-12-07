@@ -1,23 +1,30 @@
 import { createClient } from '@supabase/supabase-js'
 
+console.log('🔧 Module loading: supabase-client.js')
+
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseAnonKey = process.env.SUPABASE_ANON_KEY
 
-console.log('🔧 Supabase initialization:')
-console.log('  SUPABASE_URL:', supabaseUrl ? `✓ ${supabaseUrl.substring(0, 30)}...` : '✗ Missing')
-console.log('  SUPABASE_ANON_KEY:', supabaseAnonKey ? `✓ ${supabaseAnonKey.substring(0, 20)}...` : '✗ Missing')
+console.log('🔧 Environment variables check:')
+console.log('  SUPABASE_URL:', supabaseUrl ? `✓ Length: ${supabaseUrl.length}` : '✗ Missing')
+console.log('  SUPABASE_ANON_KEY:', supabaseAnonKey ? `✓ Length: ${supabaseAnonKey.length}` : '✗ Missing')
+console.log('  All env vars:', Object.keys(process.env).filter(k => k.includes('SUPABASE')))
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('❌ Missing Supabase environment variables')
-  throw new Error('Supabase environment variables are not configured')
+  const error = new Error('Supabase environment variables are not configured')
+  console.error('❌', error.message)
+  console.error('Available env vars:', Object.keys(process.env).join(', '))
+  throw error
 }
 
 let supabase
 try {
+  console.log('📝 Creating Supabase client with URL:', supabaseUrl)
   supabase = createClient(supabaseUrl, supabaseAnonKey)
   console.log('✅ Supabase client created successfully')
 } catch (error) {
   console.error('❌ Failed to create Supabase client:', error.message)
+  console.error('Error details:', error)
   throw error
 }
 
