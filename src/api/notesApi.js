@@ -44,9 +44,9 @@ export async function fetchNotes(category) {
       throw error
     }
     
-    // フロントエンド側でソート（createdAtの降順）
+    // フロントエンド側でソート（createdatの降順）
     const sortedData = Array.isArray(data) ? data.sort((a, b) => 
-      new Date(b.createdAt) - new Date(a.createdAt)
+      new Date(b.createdat) - new Date(a.createdat)
     ) : []
     
     console.log('✅ Notes fetched:', sortedData?.length || 0)

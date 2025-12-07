@@ -66,8 +66,10 @@ const localX = ref(props.x)
 const localY = ref(props.y)
 
 const formattedDate = computed(() => {
-  if (!props.createdAt) return ''
-  const date = new Date(props.createdAt)
+  // createdAtまたはcreatedatのいずれかを使用
+  const dateString = props.createdAt || props.createdat
+  if (!dateString) return ''
+  const date = new Date(dateString)
   return date.toLocaleString('ja-JP', {
     month: 'short',
     day: 'numeric',

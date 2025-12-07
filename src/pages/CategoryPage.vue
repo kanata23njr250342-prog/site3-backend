@@ -203,11 +203,11 @@ const currentPost = computed(() => {
 
 const displayedNotes = computed(() => {
   if (currentViewIndex.value === -1) {
-    // 作品例表示時：postIdもpostidも持たないメモを表示
-    return notes.value.filter(note => !note.postId && !note.postid)
+    // 作品例表示時：postidを持たないメモを表示
+    return notes.value.filter(note => !note.postid)
   } else if (currentPost.value) {
-    // 投稿作品表示時：該当のpostIdまたはpostidを持つメモを表示
-    return notes.value.filter(note => note.postId === currentPost.value.id || note.postid === currentPost.value.id)
+    // 投稿作品表示時：該当のpostidを持つメモを表示
+    return notes.value.filter(note => note.postid === currentPost.value.id)
   } else {
     return []
   }
@@ -462,7 +462,7 @@ const addNote = async () => {
       updatedat: new Date().toISOString(),
       isOwn: true,
       postid: isPostView ? currentPost.value.id : undefined,
-      isExample: false,
+      isexample: false,
       migrated: true,
       authorid: getCurrentUserId()
     }
@@ -475,7 +475,7 @@ const addNote = async () => {
         ...savedNote,
         postid: savedNote.postid,  // Supabaseから返されたpostidを使用
         isOwn: true,
-        isExample: false
+        isexample: false
       })
     } else {
       notes.value.push(noteDataForUI)
@@ -502,7 +502,7 @@ const saveEditNote = async () => {
       author: editingNote.value.author
     }
     
-    if (note && !note.isExample && note.postId) {
+    if (note && !note.isExample) {
       await updateNote(editingNote.value.id, updates)
     }
     
@@ -570,7 +570,7 @@ const handleNoteUpdate = async (noteId, updates) => {
   const note = notes.value.find(n => n.id === noteId)
   if (note) {
     Object.assign(note, updates)
-    if (!note.isExample && note.postId) {
+    if (!note.isExample) {
       try {
         await updateNote(noteId, updates)
       } catch (error) {
@@ -585,7 +585,7 @@ const handleNoteDrag = async (noteId, position) => {
   if (note) {
     note.x = position.x
     note.y = position.y
-    if (!note.isExample && note.postId) {
+    if (!note.isExample) {
       try {
         await updateNote(noteId, { x: position.x, y: position.y })
       } catch (error) {
@@ -882,7 +882,7 @@ onUnmounted(() => {
             :content="note.content"
             :author="note.author"
             :color="note.color"
-            :created-at="note.createdAt"
+            :created-at="note.createdat"
             :is-own="note.isOwn"
             :zoom="zoom"
             :pan-x="panX"
