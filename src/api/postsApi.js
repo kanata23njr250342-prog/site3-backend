@@ -44,9 +44,34 @@ export async function fetchPosts(category) {
       throw new Error(`Server error: ${response.status}`)
     }
     const data = await response.json()
-    return Array.isArray(data) ? data : []
+    const posts = Array.isArray(data) ? data : []
+    
+    // ローカルストレージにキャッシュを保存
+    try {
+      const cacheKey = `posts_cache_${category}`
+      localStorage.setItem(cacheKey, JSON.stringify(posts))
+      console.log(`✅ Cached ${posts.length} posts for category: ${category}`)
+    } catch (e) {
+      console.warn('⚠️ Could not cache posts:', e.message)
+    }
+    
+    return posts
   } catch (error) {
-    console.error('Error fetching posts:', error)
+    console.error('❌ Error fetching posts:', error)
+    
+    // API呼び出しに失敗した場合、ローカルストレージからキャッシュを復元
+    try {
+      const cacheKey = `posts_cache_${category}`
+      const cached = localStorage.getItem(cacheKey)
+      if (cached) {
+        const posts = JSON.parse(cached)
+        console.log(`✅ Restored ${posts.length} posts from cache for category: ${category}`)
+        return posts
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not restore from cache:', e.message)
+    }
+    
     throw new Error(getErrorMessage('投稿作品取得', error))
   }
 }
@@ -169,6 +194,19 @@ export async function createPost(formData) {
 
     const result = await response.json()
     console.log('✅ Post created successfully:', result)
+    
+    // ローカルストレージのキャッシュを更新
+    try {
+      const cacheKey = `posts_cache_${category}`
+      const cached = localStorage.getItem(cacheKey)
+      let posts = cached ? JSON.parse(cached) : []
+      posts.push(result)
+      localStorage.setItem(cacheKey, JSON.stringify(posts))
+      console.log(`✅ Updated cache for category: ${category}`)
+    } catch (e) {
+      console.warn('⚠️ Could not update cache:', e.message)
+    }
+    
     return result
   } catch (error) {
     console.error('❌ Error creating post:', error)
