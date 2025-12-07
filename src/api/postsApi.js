@@ -59,14 +59,50 @@ export async function fetchPosts(category) {
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     console.log('📂 Converting file to Base64:', { name: file.name, size: file.size })
-    const reader = new FileReader()
-    reader.onload = () => {
-      const base64 = reader.result.split(',')[1]
-      console.log('✅ File converted to Base64, size:', base64.length)
-      resolve(base64)
-    }
-    reader.onerror = (error) => {
-      console.error('❌ FileReader error:', error)
+    
+    try {
+      const reader = new FileReader()
+      
+      const timeout = setTimeout(() => {
+        reader.abort()
+        reject(new Error('FileReader timeout'))
+      }, 30000) // 30秒のタイムアウト
+      
+      reader.onload = () => {
+        clearTimeout(timeout)
+        try {
+          const result = reader.result
+          if (!result) {
+            throw new Error('FileReader result is empty')
+          }
+          const base64 = result.split(',')[1]
+          if (!base64) {
+            throw new Error('Failed to extract base64 from result')
+          }
+          console.log('✅ File converted to Base64, size:', base64.length)
+          resolve(base64)
+        } catch (error) {
+          console.error('❌ Error processing FileReader result:', error)
+          reject(error)
+        }
+      }
+      
+      reader.onerror = (error) => {
+        clearTimeout(timeout)
+        console.error('❌ FileReader error:', error)
+        reject(error)
+      }
+      
+      reader.onabort = () => {
+        clearTimeout(timeout)
+        console.error('❌ FileReader aborted')
+        reject(new Error('FileReader was aborted'))
+      }
+      
+      console.log('🔄 Starting FileReader.readAsDataURL...')
+      reader.readAsDataURL(file)
+    } catch (error) {
+      console.error('❌ Error in fileToBase64:', error)
       reject(error)
     }
   })

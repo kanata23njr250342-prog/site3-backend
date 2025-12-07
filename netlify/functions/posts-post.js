@@ -18,6 +18,8 @@ export default async (req, context) => {
     
     let title, category, authorId, fileData, fileName
 
+    console.log('📥 Received content-type:', contentType)
+
     if (contentType.includes('application/json')) {
       // JSON形式（Base64エンコードされたファイル）
       let bodyText = req.body
@@ -28,7 +30,7 @@ export default async (req, context) => {
         bodyText = new TextDecoder().decode(buffer)
       }
       
-      console.log('📥 Received body:', bodyText.substring(0, 200))
+      console.log('📥 Received body length:', bodyText.length)
       
       const body = JSON.parse(bodyText)
       title = body.title
@@ -37,12 +39,24 @@ export default async (req, context) => {
       fileData = body.fileData // Base64形式
       fileName = body.fileName
       
-      console.log('✅ Parsed request:', { title, category, fileName, authorId, fileDataLength: fileData?.length })
-    } else {
-      // FormData形式は Netlify Functions では直接サポートされていないため、
-      // フロントエンド側でBase64に変換して送信する必要があります
-      console.error('❌ Invalid content-type:', contentType)
+      console.log('✅ Parsed JSON request:', { title, category, fileName, authorId, fileDataLength: fileData?.length })
+    } else if (contentType.includes('multipart/form-data')) {
+      // FormData形式（バイナリファイル）
+      console.log('📥 Processing FormData...')
+      const buffer = await req.arrayBuffer()
+      const uint8Array = new Uint8Array(buffer)
+      fileData = Buffer.from(uint8Array).toString('base64')
+      
+      // FormDataのパースは複雑なため、ここでは簡略化
+      // 実際にはmultipart-parserライブラリを使用することを推奨
+      console.error('❌ FormData parsing not implemented')
       return new Response(JSON.stringify({ error: 'Please send file as Base64 in JSON format' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      })
+    } else {
+      console.error('❌ Invalid content-type:', contentType)
+      return new Response(JSON.stringify({ error: 'Invalid content-type' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       })
