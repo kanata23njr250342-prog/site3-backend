@@ -124,12 +124,10 @@ export default async (req, context) => {
   } catch (error) {
     console.error('❌ Error creating post:', error.message)
     console.error('Stack:', error.stack)
-    console.error('Full error:', error)
     return new Response(JSON.stringify({ 
       error: 'Failed to create post',
       message: error.message,
-      details: error.stack,
-      fullError: error.toString()
+      details: error.stack
     }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }

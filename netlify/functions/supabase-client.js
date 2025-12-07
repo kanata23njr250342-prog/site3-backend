@@ -32,29 +32,45 @@ export async function getDb() {
   return {
     // メモ関連
     getNotes: async (category) => {
-      const { data, error } = await supabase
-        .from('notes')
-        .select('*')
-        .eq('category', category)
-      
-      if (error) {
-        console.error('❌ Error fetching notes:', error)
+      try {
+        console.log('📖 Fetching notes for category:', category)
+        const { data, error } = await supabase
+          .from('notes')
+          .select('*')
+          .eq('category', category)
+        
+        if (error) {
+          console.error('❌ Error fetching notes:', error.message)
+          console.error('Error details:', error)
+          return []
+        }
+        console.log('✅ Fetched', data?.length || 0, 'notes')
+        return data || []
+      } catch (e) {
+        console.error('❌ Exception in getNotes:', e.message)
         return []
       }
-      return data || []
     },
 
     addNote: async (note) => {
-      const { data, error } = await supabase
-        .from('notes')
-        .insert([note])
-        .select()
-      
-      if (error) {
-        console.error('❌ Error adding note:', error)
-        throw error
+      try {
+        console.log('📝 Adding note:', note.id)
+        const { data, error } = await supabase
+          .from('notes')
+          .insert([note])
+          .select()
+        
+        if (error) {
+          console.error('❌ Error adding note:', error.message)
+          console.error('Error details:', error)
+          throw error
+        }
+        console.log('✅ Note added:', data?.[0]?.id)
+        return data?.[0] || note
+      } catch (e) {
+        console.error('❌ Exception in addNote:', e.message)
+        throw e
       }
-      return data?.[0] || note
     },
 
     updateNote: async (id, updates) => {
@@ -101,29 +117,46 @@ export async function getDb() {
 
     // 投稿作品関連
     getPosts: async (category) => {
-      const { data, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('category', category)
-      
-      if (error) {
-        console.error('❌ Error fetching posts:', error)
+      try {
+        console.log('📖 Fetching posts for category:', category)
+        const { data, error } = await supabase
+          .from('posts')
+          .select('*')
+          .eq('category', category)
+        
+        if (error) {
+          console.error('❌ Error fetching posts:', error.message)
+          console.error('Error details:', error)
+          return []
+        }
+        console.log('✅ Fetched', data?.length || 0, 'posts')
+        return data || []
+      } catch (e) {
+        console.error('❌ Exception in getPosts:', e.message)
         return []
       }
-      return data || []
     },
 
     addPost: async (post) => {
-      const { data, error } = await supabase
-        .from('posts')
-        .insert([post])
-        .select()
-      
-      if (error) {
-        console.error('❌ Error adding post:', error)
-        throw error
+      try {
+        console.log('📝 Adding post:', post.id, 'with columns:', Object.keys(post))
+        const { data, error } = await supabase
+          .from('posts')
+          .insert([post])
+          .select()
+        
+        if (error) {
+          console.error('❌ Error adding post:', error.message)
+          console.error('Error code:', error.code)
+          console.error('Error details:', error)
+          throw new Error(`Failed to insert post: ${error.message}`)
+        }
+        console.log('✅ Post added:', data?.[0]?.id)
+        return data?.[0] || post
+      } catch (e) {
+        console.error('❌ Exception in addPost:', e.message)
+        throw e
       }
-      return data?.[0] || post
     },
 
     updatePost: async (id, updates) => {
