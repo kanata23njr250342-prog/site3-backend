@@ -12,6 +12,7 @@ import { fetchPosts, createPost, updatePost, deletePost as deletePostApi } from 
 import { loadDeletedExampleNoteIds, saveDeletedExampleNoteIds } from '../utils/storage.js'
 import { screenToCanvas } from '../utils/coordinates.js'
 import { getCurrentUserId, isCurrentUser } from '../utils/auth.js'
+import { compressImage, isFileTooLarge, shouldCompress, formatFileSize } from '../utils/imageCompressor.js'
 
 const router = useRouter()
 const props = defineProps({
@@ -633,16 +634,58 @@ const addPost = async () => {
   }
 
   try {
+    let fileToUpload = newPostForm.value.file
+    const originalSize = fileToUpload.size
+
+    // ファイルサイズチェック（最大10MB）
+    const MAX_FILE_SIZE = 10 * 1024 * 1024
+    if (isFileTooLarge(fileToUpload, 10)) {
+      console.log('⚠️ File is too large, compression required')
+      alert(`ファイルサイズが大きいため、圧縮が必要です。\n現在: ${formatFileSize(originalSize)}`)
+      return
+    }
+
+    // 圧縮が推奨される場合（5MB以上）
+    if (shouldCompress(fileToUpload, 5)) {
+      console.log('💾 File size suggests compression')
+      const userChoice = confirm(
+        `ファイルサイズが大きいため、圧縮をお勧めします。\n` +
+        `現在: ${formatFileSize(originalSize)}\n\n` +
+        `圧縮しますか？（品質は若干低下します）`
+      )
+
+      if (userChoice) {
+        try {
+          console.log('🔄 Starting compression...')
+          const compressionResult = await compressImage(fileToUpload, {
+            quality: 0.8,
+            maxWidth: 1920,
+            maxHeight: 1080
+          })
+          
+          fileToUpload = compressionResult.compressed
+          console.log(`📊 Compression complete: ${compressionResult.ratio}% reduction`)
+          alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
+                `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
+        } catch (compressionError) {
+          console.error('❌ Compression failed:', compressionError)
+          alert('圧縮に失敗しました。そのまま保存します。')
+          // 圧縮失敗時は元ファイルで続行
+        }
+      }
+    }
+
     console.log('📝 Creating FormData with:', {
       title: newPostForm.value.title.trim(),
       category: props.name,
-      fileName: newPostForm.value.file.name
+      fileName: fileToUpload.name,
+      fileSize: formatFileSize(fileToUpload.size)
     })
 
     const formData = new FormData()
     formData.append('title', newPostForm.value.title.trim())
     formData.append('category', props.name)
-    formData.append('file', newPostForm.value.file)
+    formData.append('file', fileToUpload)
 
     console.log('🚀 Calling createPost...')
     const savedPost = await createPost(formData)
