@@ -7,8 +7,8 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const DATA_DIR = path.join(__dirname, '..', '..', 'data')
+const currentDir = path.dirname(fileURLToPath(import.meta.url))
+const DATA_DIR = path.join(currentDir, '..', '..', 'data')
 const NOTES_FILE = path.join(DATA_DIR, 'notes.json')
 const POSTS_FILE = path.join(DATA_DIR, 'posts.json')
 
