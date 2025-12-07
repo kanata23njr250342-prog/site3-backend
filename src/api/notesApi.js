@@ -5,7 +5,10 @@
 
 import { getCurrentUserId } from '../utils/auth.js'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+// 開発環境ではローカルサーバー、本番環境ではNetlify Functionsを使用
+const API_BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:3000/api'
+  : '/api'
 
 /**
  * APIエラーメッセージを生成

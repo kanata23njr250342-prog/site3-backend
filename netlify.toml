@@ -1,0 +1,14 @@
+[build]
+command = "npm run build"
+functions = "netlify/functions"
+publish = "dist"
+
+[dev]
+functions = "netlify/functions"
+
+# APIリダイレクト設定
+[[redirects]]
+from = "/api/*"
+to = "/.netlify/functions/:splat"
+status = 200
+force = true

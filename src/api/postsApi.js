@@ -5,7 +5,10 @@
 
 import { getCurrentUserId } from '../utils/auth.js'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api'
+// 開発環境ではローカルサーバー、本番環境ではNetlify Functionsを使用
+const API_BASE_URL = import.meta.env.DEV 
+  ? 'http://localhost:3000/api'
+  : '/api'
 
 /**
  * APIエラーメッセージを生成
@@ -46,6 +49,22 @@ export async function fetchPosts(category) {
 }
 
 /**
+ * ファイルをBase64に変換
+ * @param {File} file - ファイルオブジェクト
+ * @returns {Promise<string>} Base64文字列
+ */
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const base64 = reader.result.split(',')[1]
+      resolve(base64)
+    }
+    reader.onerror = reject
+  })
+}
+
+/**
  * 新しい投稿作品を作成する
  * @async
  * @param {FormData} formData - フォームデータ（title, file, category）
@@ -58,12 +77,29 @@ export async function createPost(formData) {
   }
 
   try {
-    // ユーザーIDを追加
-    formData.append('authorId', getCurrentUserId())
+    const title = formData.get('title')
+    const category = formData.get('category')
+    const file = formData.get('file')
+
+    if (!title || !category || !file) {
+      throw new Error('必須項目が不足しています')
+    }
+
+    // ファイルをBase64に変換
+    const fileData = await fileToBase64(file)
 
     const response = await fetch(`${API_BASE_URL}/posts`, {
       method: 'POST',
-      body: formData
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        title,
+        category,
+        fileData,
+        fileName: file.name,
+        authorId: getCurrentUserId()
+      })
     })
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
