@@ -1,4 +1,4 @@
-import { getDb } from './db.js'
+import { getDb } from './supabase-client.js'
 
 /**
  * Base64文字列をBuffer に変換
@@ -78,7 +78,7 @@ export default async (req, context) => {
       })
     }
 
-    const db = getDb()
+    const db = await getDb()
     const now = new Date().toISOString()
     const postId = Date.now().toString()
 
@@ -109,15 +109,15 @@ export default async (req, context) => {
       fileName,
       authorId,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      migrated: true
     }
 
-    db.addPost(post)
+    console.log('📝 Adding post to Supabase:', { id: postId, title, category })
+    const savedPost = await db.addPost(post)
+    console.log('✅ Post saved successfully:', savedPost.id)
 
-    return new Response(JSON.stringify({
-      ...post
-      // srcはフロントエンドで表示するために完全なdata:URLを返す
-    }), {
+    return new Response(JSON.stringify(savedPost), {
       status: 201,
       headers: { 'Content-Type': 'application/json' }
     })

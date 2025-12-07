@@ -1,4 +1,4 @@
-import { getDb } from './db.js'
+import { getDb } from './supabase-client.js'
 
 export default async (req, context) => {
   if (req.method !== 'POST') {
@@ -28,7 +28,7 @@ export default async (req, context) => {
       })
     }
 
-    const db = getDb()
+    const db = await getDb()
     const now = new Date().toISOString()
 
     const note = {
@@ -44,10 +44,11 @@ export default async (req, context) => {
       postId,
       authorId,
       createdAt: now,
-      updatedAt: now
+      updatedAt: now,
+      migrated: true
     }
 
-    db.addNote(note)
+    const savedNote = await db.addNote(note)
 
     return new Response(JSON.stringify(note), {
       status: 201,

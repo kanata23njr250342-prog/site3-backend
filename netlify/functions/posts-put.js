@@ -1,4 +1,4 @@
-import { getDb } from './db.js'
+import { getDb } from './supabase-client.js'
 
 export default async (req, context) => {
   if (req.method !== 'PUT') {
@@ -23,8 +23,8 @@ export default async (req, context) => {
       })
     }
 
-    const db = getDb()
-    const updated = db.updatePost(id, { title })
+    const db = await getDb()
+    const updated = await db.updatePost(id, { title })
 
     if (!updated) {
       return new Response(JSON.stringify({ error: 'Post not found' }), {

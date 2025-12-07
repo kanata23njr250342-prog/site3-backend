@@ -1,4 +1,4 @@
-import { getDb } from './db.js'
+import { getDb } from './supabase-client.js'
 
 export default async (req, context) => {
   if (req.method !== 'PUT') {
@@ -16,7 +16,7 @@ export default async (req, context) => {
     const body = JSON.parse(bodyText)
     const { content, author, width, height, x, y } = body
 
-    const db = getDb()
+    const db = await getDb()
     const updates = {}
 
     if (content !== undefined) updates.content = content
@@ -26,7 +26,7 @@ export default async (req, context) => {
     if (x !== undefined) updates.x = x
     if (y !== undefined) updates.y = y
 
-    const updated = db.updateNote(id, updates)
+    const updated = await db.updateNote(id, updates)
 
     if (!updated) {
       return new Response(JSON.stringify({ error: 'Note not found' }), {
