@@ -470,10 +470,10 @@ const addNote = async () => {
     if (isPostView) {
       const savedNote = await createNote(noteDataForDB)
       // Supabaseから返されたデータ（postid, id等）とUIデータをマージ
+      // UIプロパティ（color, width, height, author）を優先して保持
       notes.value.push({
-        ...noteDataForUI,
-        ...savedNote,
-        postid: savedNote.postid,  // Supabaseから返されたpostidを使用
+        ...savedNote,  // Supabaseから返されたデータ（id, postid等）
+        ...noteDataForUI,  // UIプロパティ（color, width, height, author等）で上書き
         isOwn: true,
         isexample: false
       })
@@ -769,6 +769,11 @@ onMounted(async () => {
       const fetchedNotes = await fetchNotes(props.name)
       backendNotes = fetchedNotes.map(note => ({
         ...note,
+        // UIプロパティを追加（Supabaseに保存されていないため）
+        width: note.width || 200,
+        height: note.height || 200,
+        color: note.color || getRandomColor(),
+        author: note.author || '匿名',
         isOwn: isCurrentUser(note.authorid),
         isExample: false
       }))
