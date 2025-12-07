@@ -1,4 +1,4 @@
-import { getDb } from './supabase-client.js'
+import { getDb } from './db.js'
 
 export default async (req, context) => {
   if (req.method !== 'DELETE') {
@@ -8,9 +8,9 @@ export default async (req, context) => {
   try {
     const url = new URL(req.url)
     const id = url.searchParams.get('id')
-    const db = await getDb()
+    const db = getDb()
 
-    const deleted = await db.deleteNote(id)
+    const deleted = db.deleteNote(id)
 
     if (!deleted) {
       return new Response(JSON.stringify({ error: 'Note not found' }), {

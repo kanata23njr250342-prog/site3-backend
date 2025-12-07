@@ -1,14 +1,10 @@
 /**
- * 投稿作品API通信モジュール
+ * 投稿作品API通信モジュール（Supabase対応）
  * @module postsApi
  */
 
+import { supabase } from '../lib/supabase.js'
 import { getCurrentUserId } from '../utils/auth.js'
-
-// 開発環境ではローカルサーバー、本番環境ではNetlify Functionsを直接呼び出し
-const API_BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:3000/api'
-  : '/.netlify/functions'
 
 /**
  * APIエラーメッセージを生成
@@ -36,17 +32,23 @@ export async function fetchPosts(category) {
   }
 
   try {
-    const endpoint = import.meta.env.DEV
-      ? `${API_BASE_URL}/posts/${encodeURIComponent(category)}`
-      : `${API_BASE_URL}/posts-get?category=${encodeURIComponent(category)}`
-    const response = await fetch(endpoint)
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`)
+    console.log('📥 Fetching posts from Supabase:', { category })
+    
+    const { data, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('category', category)
+      .order('createdAt', { ascending: false })
+    
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
     }
-    const data = await response.json()
+    
+    console.log('✅ Posts fetched:', data?.length || 0)
     return Array.isArray(data) ? data : []
   } catch (error) {
-    console.error('Error fetching posts:', error)
+    console.error('❌ Error fetching posts:', error)
     throw new Error(getErrorMessage('投稿作品取得', error))
   }
 }
@@ -124,6 +126,7 @@ export async function createPost(formData) {
     const title = formData.get('title')
     const category = formData.get('category')
     const file = formData.get('file')
+    const authorId = getCurrentUserId()
 
     console.log('📋 createPost - Extracted form data:', { title, category, fileName: file?.name })
 
@@ -134,40 +137,45 @@ export async function createPost(formData) {
     // ファイルをBase64に変換
     console.log('🔄 Starting Base64 conversion...')
     const fileData = await fileToBase64(file)
-
-    const payload = {
-      title,
-      category,
-      fileData,
-      fileName: file.name,
-      authorId: getCurrentUserId()
-    }
-    console.log('📤 Sending POST request to:', `${API_BASE_URL}/posts`)
-    console.log('📦 Payload size:', JSON.stringify(payload).length, 'bytes')
-
-    const endpoint = import.meta.env.DEV 
-      ? `${API_BASE_URL}/posts`
-      : `${API_BASE_URL}/posts-post`
     
-    console.log('📍 Using endpoint:', endpoint)
+    // MIME typeを判定
+    const getMimeType = (fileName) => {
+      const ext = fileName.toLowerCase().split('.').pop()
+      const mimeTypes = {
+        'png': 'image/png',
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'mp4': 'video/mp4',
+        'webm': 'video/webm',
+        'mov': 'video/quicktime'
+      }
+      return mimeTypes[ext] || 'application/octet-stream'
+    }
     
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
-    })
+    const mimeType = getMimeType(file.name)
+    const src = `data:${mimeType};base64,${fileData}`
 
-    console.log('📥 Response status:', response.status)
+    console.log('📤 Creating post in Supabase...')
+    
+    const { data, error } = await supabase
+      .from('posts')
+      .insert([{
+        title,
+        category,
+        src,
+        fileName: file.name,
+        authorId
+      }])
+      .select()
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error('❌ API error response:', errorData)
-      throw new Error(errorData.error || `Server error: ${response.status}`)
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
     }
 
-    const result = await response.json()
+    const result = data[0]
     console.log('✅ Post created successfully:', result)
     return result
   } catch (error) {
@@ -193,23 +201,26 @@ export async function updatePost(postId, updates) {
   }
 
   try {
-    const endpoint = import.meta.env.DEV
-      ? `${API_BASE_URL}/posts/${postId}`
-      : `${API_BASE_URL}/posts-put?id=${postId}`
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(updates)
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Server error: ${response.status}`)
+    console.log('📝 Updating post in Supabase:', { postId, updates })
+    
+    const { data, error } = await supabase
+      .from('posts')
+      .update({
+        ...updates,
+        updatedAt: new Date().toISOString()
+      })
+      .eq('id', postId)
+      .select()
+
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
     }
-    return await response.json()
+
+    console.log('✅ Post updated successfully:', data[0])
+    return data[0]
   } catch (error) {
-    console.error('Error updating post:', error)
+    console.error('❌ Error updating post:', error)
     throw new Error(getErrorMessage('投稿作品更新', error))
   }
 }
@@ -227,19 +238,22 @@ export async function deletePost(postId) {
   }
 
   try {
-    const endpoint = import.meta.env.DEV
-      ? `${API_BASE_URL}/posts/${postId}`
-      : `${API_BASE_URL}/posts-delete?id=${postId}`
-    const response = await fetch(endpoint, {
-      method: 'DELETE'
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Server error: ${response.status}`)
+    console.log('🗑️ Deleting post from Supabase:', { postId })
+    
+    const { error } = await supabase
+      .from('posts')
+      .delete()
+      .eq('id', postId)
+
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
     }
-    return await response.json()
+
+    console.log('✅ Post deleted successfully')
+    return { success: true }
   } catch (error) {
-    console.error('Error deleting post:', error)
+    console.error('❌ Error deleting post:', error)
     throw new Error(getErrorMessage('投稿作品削除', error))
   }
 }

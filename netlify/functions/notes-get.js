@@ -1,4 +1,4 @@
-import { getDb } from './supabase-client.js'
+import { getDb } from './db.js'
 
 export default async (req, context) => {
   if (req.method !== 'GET') {
@@ -16,11 +16,10 @@ export default async (req, context) => {
       })
     }
 
-    const db = await getDb()
-    const notes = await db.getNotes(category)
-    const sortedNotes = notes.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    const db = getDb()
+    const notes = db.getNotes(category).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     
-    return new Response(JSON.stringify(sortedNotes), {
+    return new Response(JSON.stringify(notes), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     })

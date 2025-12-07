@@ -1,4 +1,4 @@
-import { getDb } from './supabase-client.js'
+import { getDb } from './db.js'
 
 export default async (req, context) => {
   if (req.method !== 'GET') {
@@ -16,21 +16,16 @@ export default async (req, context) => {
       })
     }
 
-    const db = await getDb()
-    const posts = await db.getPosts(category)
+    const db = getDb()
+    const posts = db.getPosts(category).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     
-    // 新しい順でソート
-    const sortedPosts = posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-    
-    console.log('✅ Fetched', sortedPosts.length, 'posts for category:', category)
-    
-    return new Response(JSON.stringify(sortedPosts), {
+    return new Response(JSON.stringify(posts), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     })
   } catch (error) {
-    console.error('❌ Error fetching posts:', error.message)
-    return new Response(JSON.stringify({ error: 'Failed to fetch posts', message: error.message }), {
+    console.error('Error fetching posts:', error)
+    return new Response(JSON.stringify({ error: 'Failed to fetch posts' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     })

@@ -1,14 +1,10 @@
 /**
- * メモAPI通信モジュール
+ * メモAPI通信モジュール（Supabase対応）
  * @module notesApi
  */
 
+import { supabase } from '../lib/supabase.js'
 import { getCurrentUserId } from '../utils/auth.js'
-
-// 開発環境ではローカルサーバー、本番環境ではNetlify Functionsを直接呼び出し
-const API_BASE_URL = import.meta.env.DEV 
-  ? 'http://localhost:3000/api'
-  : '/.netlify/functions'
 
 /**
  * APIエラーメッセージを生成
@@ -36,17 +32,23 @@ export async function fetchNotes(category) {
   }
 
   try {
-    const endpoint = import.meta.env.DEV
-      ? `${API_BASE_URL}/notes/${encodeURIComponent(category)}`
-      : `${API_BASE_URL}/notes-get?category=${encodeURIComponent(category)}`
-    const response = await fetch(endpoint)
-    if (!response.ok) {
-      throw new Error(`Server error: ${response.status}`)
+    console.log('📥 Fetching notes from Supabase:', { category })
+    
+    const { data, error } = await supabase
+      .from('notes')
+      .select('*')
+      .eq('category', category)
+      .order('createdAt', { ascending: false })
+    
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
     }
-    const data = await response.json()
+    
+    console.log('✅ Notes fetched:', data?.length || 0)
     return Array.isArray(data) ? data : []
   } catch (error) {
-    console.error('Error fetching notes:', error)
+    console.error('❌ Error fetching notes:', error)
     throw new Error(getErrorMessage('メモ取得', error))
   }
 }
@@ -64,30 +66,25 @@ export async function createNote(noteData) {
   }
 
   try {
-    // ユーザーIDを追加
-    const dataWithUserId = {
-      ...noteData,
-      authorId: getCurrentUserId()
+    console.log('📝 Creating note in Supabase:', noteData)
+    
+    const { data, error } = await supabase
+      .from('notes')
+      .insert([{
+        ...noteData,
+        authorId: getCurrentUserId()
+      }])
+      .select()
+
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
     }
 
-    const endpoint = import.meta.env.DEV
-      ? `${API_BASE_URL}/notes`
-      : `${API_BASE_URL}/notes-post`
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(dataWithUserId)
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Server error: ${response.status}`)
-    }
-    return await response.json()
+    console.log('✅ Note created successfully:', data[0])
+    return data[0]
   } catch (error) {
-    console.error('Error creating note:', error)
+    console.error('❌ Error creating note:', error)
     throw new Error(getErrorMessage('メモ作成', error))
   }
 }
@@ -109,23 +106,23 @@ export async function updateNote(noteId, updates) {
   }
 
   try {
-    const endpoint = import.meta.env.DEV
-      ? `${API_BASE_URL}/notes/${noteId}`
-      : `${API_BASE_URL}/notes-put?id=${noteId}`
-    const response = await fetch(endpoint, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(updates)
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Server error: ${response.status}`)
+    console.log('📝 Updating note in Supabase:', { noteId, updates })
+    
+    const { data, error } = await supabase
+      .from('notes')
+      .update(updates)
+      .eq('id', noteId)
+      .select()
+
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
     }
-    return await response.json()
+
+    console.log('✅ Note updated successfully:', data[0])
+    return data[0]
   } catch (error) {
-    console.error('Error updating note:', error)
+    console.error('❌ Error updating note:', error)
     throw new Error(getErrorMessage('メモ更新', error))
   }
 }
@@ -143,19 +140,22 @@ export async function deleteNote(noteId) {
   }
 
   try {
-    const endpoint = import.meta.env.DEV
-      ? `${API_BASE_URL}/notes/${noteId}`
-      : `${API_BASE_URL}/notes-delete?id=${noteId}`
-    const response = await fetch(endpoint, {
-      method: 'DELETE'
-    })
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      throw new Error(errorData.error || `Server error: ${response.status}`)
+    console.log('🗑️ Deleting note from Supabase:', { noteId })
+    
+    const { error } = await supabase
+      .from('notes')
+      .delete()
+      .eq('id', noteId)
+
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      throw error
     }
-    return await response.json()
+
+    console.log('✅ Note deleted successfully')
+    return { success: true }
   } catch (error) {
-    console.error('Error deleting note:', error)
+    console.error('❌ Error deleting note:', error)
     throw new Error(getErrorMessage('メモ削除', error))
   }
 }
