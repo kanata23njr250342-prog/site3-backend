@@ -601,14 +601,7 @@ const handleFileSelect = (e) => {
   const file = e.target.files?.[0]
   if (!file) return
 
-  // ファイルサイズチェック（最大10MB、圧縮で対応）
-  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
-  if (file.size > MAX_FILE_SIZE) {
-    alert(`ファイルサイズが大きすぎます。最大${MAX_FILE_SIZE / 1024 / 1024}MBまでです。`)
-    e.target.value = ''
-    return
-  }
-
+  // ファイルサイズチェックはaddPost内で行う（圧縮オプション提示のため）
   newPostForm.value.file = file
 
   const reader = new FileReader()
@@ -641,12 +634,37 @@ const addPost = async () => {
     const MAX_FILE_SIZE = 10 * 1024 * 1024
     if (isFileTooLarge(fileToUpload, 10)) {
       console.log('⚠️ File is too large, compression required')
-      alert(`ファイルサイズが大きいため、圧縮が必要です。\n現在: ${formatFileSize(originalSize)}`)
-      return
-    }
+      const userChoice = confirm(
+        `ファイルサイズが大きすぎます（${formatFileSize(originalSize)}）。\n` +
+        `圧縮を行いますか？\n\n` +
+        `圧縮すると品質が若干低下しますが、アップロード可能になります。`
+      )
 
-    // 圧縮が推奨される場合（5MB以上）
-    if (shouldCompress(fileToUpload, 5)) {
+      if (userChoice) {
+        try {
+          console.log('🔄 Starting compression...')
+          const compressionResult = await compressImage(fileToUpload, {
+            quality: 0.8,
+            maxWidth: 1920,
+            maxHeight: 1080
+          })
+          
+          fileToUpload = compressionResult.compressed
+          console.log(`📊 Compression complete: ${compressionResult.ratio}% reduction`)
+          alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
+                `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
+        } catch (compressionError) {
+          console.error('❌ Compression failed:', compressionError)
+          alert('圧縮に失敗しました。別のファイルを選択してください。')
+          return
+        }
+      } else {
+        console.log('❌ User cancelled compression')
+        return
+      }
+    }
+    // 圧縮が推奨される場合（5MB以上10MB未満）
+    else if (shouldCompress(fileToUpload, 5)) {
       console.log('💾 File size suggests compression')
       const userChoice = confirm(
         `ファイルサイズが大きいため、圧縮をお勧めします。\n` +
