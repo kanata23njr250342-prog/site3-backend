@@ -203,9 +203,11 @@ const currentPost = computed(() => {
 
 const displayedNotes = computed(() => {
   if (currentViewIndex.value === -1) {
-    return notes.value.filter(note => !note.postId)
+    // 作品例表示時：postIdもpostidも持たないメモを表示
+    return notes.value.filter(note => !note.postId && !note.postid)
   } else if (currentPost.value) {
-    return notes.value.filter(note => note.postId === currentPost.value.id)
+    // 投稿作品表示時：該当のpostIdまたはpostidを持つメモを表示
+    return notes.value.filter(note => note.postId === currentPost.value.id || note.postid === currentPost.value.id)
   } else {
     return []
   }
@@ -467,9 +469,11 @@ const addNote = async () => {
     
     if (isPostView) {
       const savedNote = await createNote(noteDataForDB)
+      // Supabaseから返されたデータ（postid, id等）とUIデータをマージ
       notes.value.push({
         ...noteDataForUI,
         ...savedNote,
+        postid: savedNote.postid,  // Supabaseから返されたpostidを使用
         isOwn: true,
         isExample: false
       })
