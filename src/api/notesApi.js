@@ -76,7 +76,7 @@ export async function createNote(noteData) {
       .from('notes')
       .insert([{
         ...noteData,
-        authorId: getCurrentUserId()
+        authorid: getCurrentUserId()
       }])
       .select()
 

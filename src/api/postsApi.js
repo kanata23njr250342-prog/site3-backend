@@ -169,8 +169,8 @@ export async function createPost(formData) {
         title,
         category,
         src,
-        fileName: file.name,
-        authorId
+        filename: file.name,
+        authorid: authorId
       }])
       .select()
 

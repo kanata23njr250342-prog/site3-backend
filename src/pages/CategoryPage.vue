@@ -444,10 +444,10 @@ const addNote = async () => {
       content: newNoteForm.value.content.trim(),
       author: newNoteForm.value.author?.trim() || '匿名',
       color: getRandomColor(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdat: new Date().toISOString(),
+      updatedat: new Date().toISOString(),
       isOwn: true,
-      postId: isPostView ? currentPost.value.id : undefined,
+      postid: isPostView ? currentPost.value.id : undefined,
       isExample: false,
       migrated: true
     }
@@ -745,7 +745,7 @@ onMounted(async () => {
       const fetchedNotes = await fetchNotes(props.name)
       backendNotes = fetchedNotes.map(note => ({
         ...note,
-        isOwn: isCurrentUser(note.authorId),
+        isOwn: isCurrentUser(note.authorid),
         isExample: false
       }))
     } catch (error) {
@@ -759,12 +759,12 @@ onMounted(async () => {
         width: 200,
         height: 200,
         color: getRandomColor(),
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        createdat: new Date().toISOString(),
+        updatedat: new Date().toISOString(),
         isOwn: true,
         isExample: true,
         migrated: true,
-        authorId: getCurrentUserId()
+        authorid: getCurrentUserId()
       }))
 
     notes.value = [...exampleNotes, ...backendNotes]
@@ -773,7 +773,7 @@ onMounted(async () => {
       const posts = await fetchPosts(props.name)
       postsByCategory.value[props.name] = posts.map(post => ({
         ...post,
-        isOwn: isCurrentUser(post.authorId)
+        isOwn: isCurrentUser(post.authorid)
       }))
     } catch (error) {
       console.error('Failed to load posts:', error)
