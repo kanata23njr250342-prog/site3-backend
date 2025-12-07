@@ -29,26 +29,35 @@ try {
     }
   })
   console.log('✅ Supabase client created successfully')
-  
-  // テスト接続
-  console.log('🔗 Testing Supabase connection...')
-  const { data: testData, error: testError } = await supabase
-    .from('posts')
-    .select('id')
-    .limit(1)
-  
-  if (testError) {
-    console.warn('⚠️ Connection test error (may be normal):', testError.message)
-  } else {
-    console.log('✅ Connection test successful')
-  }
 } catch (error) {
   console.error('❌ Failed to create Supabase client:', error.message)
   console.error('Error details:', error)
   throw error
 }
 
+let isConnectionTested = false
+
 export async function getDb() {
+  // 最初の呼び出し時にテスト接続を実行
+  if (!isConnectionTested) {
+    try {
+      console.log('🔗 Testing Supabase connection...')
+      const { data: testData, error: testError } = await supabase
+        .from('posts')
+        .select('id')
+        .limit(1)
+      
+      if (testError) {
+        console.warn('⚠️ Connection test error (may be normal):', testError.message)
+      } else {
+        console.log('✅ Connection test successful')
+      }
+    } catch (e) {
+      console.warn('⚠️ Connection test exception:', e.message)
+    }
+    isConnectionTested = true
+  }
+  
   return {
     // メモ関連
     getNotes: async (category) => {
