@@ -20,8 +20,28 @@ if (!supabaseUrl || !supabaseAnonKey) {
 let supabase
 try {
   console.log('📝 Creating Supabase client with URL:', supabaseUrl)
-  supabase = createClient(supabaseUrl, supabaseAnonKey)
+  supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    db: {
+      schema: 'public'
+    },
+    auth: {
+      persistSession: false
+    }
+  })
   console.log('✅ Supabase client created successfully')
+  
+  // テスト接続
+  console.log('🔗 Testing Supabase connection...')
+  const { data: testData, error: testError } = await supabase
+    .from('posts')
+    .select('id')
+    .limit(1)
+  
+  if (testError) {
+    console.warn('⚠️ Connection test error (may be normal):', testError.message)
+  } else {
+    console.log('✅ Connection test successful')
+  }
 } catch (error) {
   console.error('❌ Failed to create Supabase client:', error.message)
   console.error('Error details:', error)
