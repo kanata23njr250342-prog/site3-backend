@@ -55,12 +55,17 @@ export async function fetchPosts(category) {
  */
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
+    console.log('📂 Converting file to Base64:', { name: file.name, size: file.size })
     const reader = new FileReader()
     reader.onload = () => {
       const base64 = reader.result.split(',')[1]
+      console.log('✅ File converted to Base64, size:', base64.length)
       resolve(base64)
     }
-    reader.onerror = reject
+    reader.onerror = (error) => {
+      console.error('❌ FileReader error:', error)
+      reject(error)
+    }
   })
 }
 
@@ -81,33 +86,47 @@ export async function createPost(formData) {
     const category = formData.get('category')
     const file = formData.get('file')
 
+    console.log('📋 createPost - Extracted form data:', { title, category, fileName: file?.name })
+
     if (!title || !category || !file) {
       throw new Error('必須項目が不足しています')
     }
 
     // ファイルをBase64に変換
+    console.log('🔄 Starting Base64 conversion...')
     const fileData = await fileToBase64(file)
+
+    const payload = {
+      title,
+      category,
+      fileData,
+      fileName: file.name,
+      authorId: getCurrentUserId()
+    }
+    console.log('📤 Sending POST request to:', `${API_BASE_URL}/posts`)
+    console.log('📦 Payload size:', JSON.stringify(payload).length, 'bytes')
 
     const response = await fetch(`${API_BASE_URL}/posts`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        title,
-        category,
-        fileData,
-        fileName: file.name,
-        authorId: getCurrentUserId()
-      })
+      body: JSON.stringify(payload)
     })
+
+    console.log('📥 Response status:', response.status)
+
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}))
+      console.error('❌ API error response:', errorData)
       throw new Error(errorData.error || `Server error: ${response.status}`)
     }
-    return await response.json()
+
+    const result = await response.json()
+    console.log('✅ Post created successfully:', result)
+    return result
   } catch (error) {
-    console.error('Error creating post:', error)
+    console.error('❌ Error creating post:', error)
     throw new Error(getErrorMessage('投稿作品作成', error))
   }
 }

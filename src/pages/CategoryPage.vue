@@ -588,23 +588,35 @@ const handleFileSelect = (e) => {
 }
 
 const addPost = async () => {
+  console.log('🔵 addPost called')
+  
   if (!newPostForm.value.title?.trim()) {
+    console.log('❌ Title is empty')
     alert('タイトルを入力してください')
     return
   }
 
   if (!newPostForm.value.file) {
+    console.log('❌ File is not selected')
     alert('画像/動画を選択してください')
     return
   }
 
   try {
+    console.log('📝 Creating FormData with:', {
+      title: newPostForm.value.title.trim(),
+      category: props.name,
+      fileName: newPostForm.value.file.name
+    })
+
     const formData = new FormData()
     formData.append('title', newPostForm.value.title.trim())
     formData.append('category', props.name)
     formData.append('file', newPostForm.value.file)
 
+    console.log('🚀 Calling createPost...')
     const savedPost = await createPost(formData)
+    console.log('✅ Post created successfully:', savedPost)
 
     postsByCategory.value[props.name].push({
       ...savedPost,
@@ -613,8 +625,9 @@ const addPost = async () => {
 
     showPostDialog.value = false
     newPostForm.value = { title: '', file: null, preview: null }
+    console.log('✅ Dialog closed and form reset')
   } catch (error) {
-    console.error('Error adding post:', error)
+    console.error('❌ Error adding post:', error)
     alert(`投稿作品の保存に失敗しました: ${error.message}`)
   }
 }
