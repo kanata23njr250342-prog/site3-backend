@@ -601,8 +601,8 @@ const handleFileSelect = (e) => {
   const file = e.target.files?.[0]
   if (!file) return
 
-  // ファイルサイズチェック（最大5MB）
-  const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+  // ファイルサイズチェック（最大10MB、圧縮で対応）
+  const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
   if (file.size > MAX_FILE_SIZE) {
     alert(`ファイルサイズが大きすぎます。最大${MAX_FILE_SIZE / 1024 / 1024}MBまでです。`)
     e.target.value = ''
