@@ -532,10 +532,13 @@ const deleteNoteHandler = async (noteId) => {
       throw new Error('メモが見つかりません')
     }
     
-    if (!note.isExample && note.postId) {
+    // 例メモでない場合、Supabaseから削除
+    if (!note.isExample) {
+      console.log('🗑️ Deleting note from Supabase:', { noteId, postid: note.postid })
       await deleteNote(noteId)
     }
     
+    // 例メモの場合、ローカルストレージに記録
     if (note.isExample) {
       deletedExampleNoteIds.value.add(noteId)
       saveDeletedExampleNoteIds(deletedExampleNoteIds.value)
@@ -543,6 +546,7 @@ const deleteNoteHandler = async (noteId) => {
     
     notes.value = notes.value.filter(n => n.id !== noteId)
     contextMenu.value = null
+    console.log('✅ Note deleted successfully')
   } catch (error) {
     console.error('Error deleting note:', error)
     alert(`メモの削除に失敗しました: ${error.message}`)
@@ -665,7 +669,9 @@ const deletePost = async (postId) => {
   }
 
   try {
+    console.log('🗑️ Deleting post from Supabase:', { postId })
     await deletePostApi(postId)
+    console.log('✅ Post deleted successfully')
 
     postsByCategory.value[props.name] = postsByCategory.value[props.name].filter(p => p.id !== postId)
     
