@@ -769,10 +769,11 @@ onMounted(async () => {
       const fetchedNotes = await fetchNotes(props.name)
       backendNotes = fetchedNotes.map(note => ({
         ...note,
-        // UIプロパティを追加（Supabaseに保存されていないため）
+        // Supabaseから取得した色とサイズを使用
+        // 色とサイズはSupabaseに保存されているため、デフォルト値は不要
         width: note.width || 200,
         height: note.height || 200,
-        color: note.color || getRandomColor(),
+        color: note.color || getRandomColor(),  // 念のためデフォルト値を用意
         author: note.author || '匿名',
         isOwn: isCurrentUser(note.authorid),
         isExample: false
