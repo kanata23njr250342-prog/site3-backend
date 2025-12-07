@@ -5,10 +5,10 @@
 
 import { getCurrentUserId } from '../utils/auth.js'
 
-// 開発環境ではローカルサーバー、本番環境ではNetlify Functionsを使用
+// 開発環境ではローカルサーバー、本番環境ではNetlify Functionsを直接呼び出し
 const API_BASE_URL = import.meta.env.DEV 
   ? 'http://localhost:3000/api'
-  : '/api'
+  : '/.netlify/functions'
 
 /**
  * APIエラーメッセージを生成
@@ -36,7 +36,10 @@ export async function fetchNotes(category) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/notes/${encodeURIComponent(category)}`)
+    const endpoint = import.meta.env.DEV
+      ? `${API_BASE_URL}/notes/${encodeURIComponent(category)}`
+      : `${API_BASE_URL}/notes-get?category=${encodeURIComponent(category)}`
+    const response = await fetch(endpoint)
     if (!response.ok) {
       throw new Error(`Server error: ${response.status}`)
     }
@@ -67,7 +70,11 @@ export async function createNote(noteData) {
       authorId: getCurrentUserId()
     }
 
-    const response = await fetch(`${API_BASE_URL}/notes`, {
+    const endpoint = import.meta.env.DEV
+      ? `${API_BASE_URL}/notes`
+      : `${API_BASE_URL}/notes-post`
+
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -102,7 +109,10 @@ export async function updateNote(noteId, updates) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+    const endpoint = import.meta.env.DEV
+      ? `${API_BASE_URL}/notes/${noteId}`
+      : `${API_BASE_URL}/notes-put?id=${noteId}`
+    const response = await fetch(endpoint, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -133,7 +143,10 @@ export async function deleteNote(noteId) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/notes/${noteId}`, {
+    const endpoint = import.meta.env.DEV
+      ? `${API_BASE_URL}/notes/${noteId}`
+      : `${API_BASE_URL}/notes-delete?id=${noteId}`
+    const response = await fetch(endpoint, {
       method: 'DELETE'
     })
     if (!response.ok) {

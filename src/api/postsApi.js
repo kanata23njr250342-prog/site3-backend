@@ -5,10 +5,10 @@
 
 import { getCurrentUserId } from '../utils/auth.js'
 
-// 開発環境ではローカルサーバー、本番環境ではNetlify Functionsを使用
+// 開発環境ではローカルサーバー、本番環境ではNetlify Functionsを直接呼び出し
 const API_BASE_URL = import.meta.env.DEV 
   ? 'http://localhost:3000/api'
-  : '/api'
+  : '/.netlify/functions'
 
 /**
  * APIエラーメッセージを生成
@@ -36,7 +36,10 @@ export async function fetchPosts(category) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/posts/${encodeURIComponent(category)}`)
+    const endpoint = import.meta.env.DEV
+      ? `${API_BASE_URL}/posts/${encodeURIComponent(category)}`
+      : `${API_BASE_URL}/posts-get?category=${encodeURIComponent(category)}`
+    const response = await fetch(endpoint)
     if (!response.ok) {
       throw new Error(`Server error: ${response.status}`)
     }
@@ -106,7 +109,13 @@ export async function createPost(formData) {
     console.log('📤 Sending POST request to:', `${API_BASE_URL}/posts`)
     console.log('📦 Payload size:', JSON.stringify(payload).length, 'bytes')
 
-    const response = await fetch(`${API_BASE_URL}/posts`, {
+    const endpoint = import.meta.env.DEV 
+      ? `${API_BASE_URL}/posts`
+      : `${API_BASE_URL}/posts-post`
+    
+    console.log('📍 Using endpoint:', endpoint)
+    
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -148,7 +157,10 @@ export async function updatePost(postId, updates) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
+    const endpoint = import.meta.env.DEV
+      ? `${API_BASE_URL}/posts/${postId}`
+      : `${API_BASE_URL}/posts-put?id=${postId}`
+    const response = await fetch(endpoint, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -179,7 +191,10 @@ export async function deletePost(postId) {
   }
 
   try {
-    const response = await fetch(`${API_BASE_URL}/posts/${postId}`, {
+    const endpoint = import.meta.env.DEV
+      ? `${API_BASE_URL}/posts/${postId}`
+      : `${API_BASE_URL}/posts-delete?id=${postId}`
+    const response = await fetch(endpoint, {
       method: 'DELETE'
     })
     if (!response.ok) {
