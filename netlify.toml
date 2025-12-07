@@ -55,3 +55,10 @@ to = "/.netlify/functions/posts-delete"
 status = 200
 force = true
 method = "DELETE"
+
+# SPA用のキャッチオールリダイレクト
+# すべてのルートをindex.htmlにリダイレクト（APIリクエスト除外）
+[[redirects]]
+from = "/*"
+to = "/index.html"
+status = 200
