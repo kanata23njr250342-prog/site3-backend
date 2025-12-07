@@ -20,8 +20,9 @@ dist-ssr
 *.suo
 *.ntvs*
 *.njsproj
-*.sln
-*.sw?
 
 # ESLint cache
 .eslintcache
+
+# Data files (generated at runtime)
+data/
