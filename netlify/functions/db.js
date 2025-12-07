@@ -1,69 +1,75 @@
 /**
  * Netlify Functions用のデータベース管理
- * ローカルファイルシステムにJSONファイルとして保存
+ * メモリ上でデータを保持（Netlify環境での永続化は別途実装が必要）
  */
 
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-
-const currentDir = path.dirname(fileURLToPath(import.meta.url))
-const DATA_DIR = path.join(currentDir, '..', '..', 'data')
-const NOTES_FILE = path.join(DATA_DIR, 'notes.json')
-const POSTS_FILE = path.join(DATA_DIR, 'posts.json')
-
-// データディレクトリが存在しなければ作成
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true })
+// メモリ内キャッシュ
+let dbCache = {
+  notes: [],
+  posts: [],
+  lastUpdated: new Date().toISOString()
 }
 
-// ファイルが存在しなければ初期化
-const initializeFiles = () => {
-  if (!fs.existsSync(NOTES_FILE)) {
-    fs.writeFileSync(NOTES_FILE, JSON.stringify([]))
+// ファイルシステムへのアクセス（オプション）
+let fsAvailable = false
+let fs, path, NOTES_FILE, POSTS_FILE
+
+try {
+  fs = await import('fs')
+  path = await import('path')
+  const { fileURLToPath } = await import('url')
+  
+  const currentDir = path.dirname(fileURLToPath(import.meta.url))
+  const DATA_DIR = path.join(currentDir, '..', '..', 'data')
+  NOTES_FILE = path.join(DATA_DIR, 'notes.json')
+  POSTS_FILE = path.join(DATA_DIR, 'posts.json')
+  
+  // ファイルシステムが利用可能か確認
+  if (fs && fs.existsSync && fs.writeFileSync) {
+    fsAvailable = true
+    
+    // ディレクトリ作成
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true })
+    }
+    
+    // ファイル初期化
+    if (!fs.existsSync(NOTES_FILE)) {
+      fs.writeFileSync(NOTES_FILE, JSON.stringify([]))
+    }
+    if (!fs.existsSync(POSTS_FILE)) {
+      fs.writeFileSync(POSTS_FILE, JSON.stringify([]))
+    }
+    
+    // 既存ファイルからデータを読み込む
+    try {
+      const notesData = fs.readFileSync(NOTES_FILE, 'utf-8')
+      dbCache.notes = JSON.parse(notesData)
+    } catch (e) {
+      console.warn('Could not load notes from file:', e.message)
+    }
+    
+    try {
+      const postsData = fs.readFileSync(POSTS_FILE, 'utf-8')
+      dbCache.posts = JSON.parse(postsData)
+    } catch (e) {
+      console.warn('Could not load posts from file:', e.message)
+    }
   }
-  if (!fs.existsSync(POSTS_FILE)) {
-    fs.writeFileSync(POSTS_FILE, JSON.stringify([]))
-  }
+} catch (error) {
+  console.warn('File system not available in this environment:', error.message)
+  fsAvailable = false
 }
 
-initializeFiles()
-
-// ファイルからデータを読み込む
-const loadNotes = () => {
+// ファイルにデータを保存（ベストエフォート）
+const persistData = () => {
+  if (!fsAvailable || !fs || !fs.writeFileSync) return
+  
   try {
-    const data = fs.readFileSync(NOTES_FILE, 'utf-8')
-    return JSON.parse(data)
+    fs.writeFileSync(NOTES_FILE, JSON.stringify(dbCache.notes, null, 2))
+    fs.writeFileSync(POSTS_FILE, JSON.stringify(dbCache.posts, null, 2))
   } catch (error) {
-    console.error('Error loading notes:', error)
-    return []
-  }
-}
-
-const loadPosts = () => {
-  try {
-    const data = fs.readFileSync(POSTS_FILE, 'utf-8')
-    return JSON.parse(data)
-  } catch (error) {
-    console.error('Error loading posts:', error)
-    return []
-  }
-}
-
-// ファイルにデータを保存
-const saveNotes = (notes) => {
-  try {
-    fs.writeFileSync(NOTES_FILE, JSON.stringify(notes, null, 2))
-  } catch (error) {
-    console.error('Error saving notes:', error)
-  }
-}
-
-const savePosts = (posts) => {
-  try {
-    fs.writeFileSync(POSTS_FILE, JSON.stringify(posts, null, 2))
-  } catch (error) {
-    console.error('Error saving posts:', error)
+    console.warn('Could not persist data to file:', error.message)
   }
 }
 
@@ -95,80 +101,72 @@ export function getDb() {
   return {
     // メモ関連
     getNotes: (category) => {
-      const notes = loadNotes()
-      return notes.filter(note => note.category === category)
+      return dbCache.notes.filter(note => note.category === category)
     },
     addNote: (note) => {
-      const notes = loadNotes()
       const migratedNote = migrateNote(note)
-      notes.push(migratedNote)
-      saveNotes(notes)
+      dbCache.notes.push(migratedNote)
+      persistData()
       return migratedNote
     },
     updateNote: (id, updates) => {
-      const notes = loadNotes()
-      const index = notes.findIndex(n => n.id === id)
+      const index = dbCache.notes.findIndex(n => n.id === id)
       if (index !== -1) {
-        notes[index] = {
-          ...notes[index],
+        dbCache.notes[index] = {
+          ...dbCache.notes[index],
           ...updates,
           updatedAt: new Date().toISOString(),
           migrated: true
         }
-        saveNotes(notes)
-        return notes[index]
+        persistData()
+        return dbCache.notes[index]
       }
       return null
     },
     deleteNote: (id) => {
-      const notes = loadNotes()
-      const index = notes.findIndex(n => n.id === id)
+      const index = dbCache.notes.findIndex(n => n.id === id)
       if (index !== -1) {
-        notes.splice(index, 1)
-        saveNotes(notes)
+        dbCache.notes.splice(index, 1)
+        persistData()
         return true
       }
       return false
     },
-    getAllNotes: () => loadNotes(),
+    getAllNotes: () => dbCache.notes,
 
     // 投稿作品関連
     getPosts: (category) => {
-      const posts = loadPosts()
-      return posts.filter(post => post.category === category)
+      return dbCache.posts.filter(post => post.category === category)
     },
     addPost: (post) => {
-      const posts = loadPosts()
       const migratedPost = migratePost(post)
-      posts.push(migratedPost)
-      savePosts(posts)
+      dbCache.posts.push(migratedPost)
+      persistData()
       return migratedPost
     },
     updatePost: (id, updates) => {
-      const posts = loadPosts()
-      const index = posts.findIndex(p => p.id === id)
+      const index = dbCache.posts.findIndex(p => p.id === id)
       if (index !== -1) {
-        posts[index] = {
-          ...posts[index],
+        dbCache.posts[index] = {
+          ...dbCache.posts[index],
           ...updates,
           updatedAt: new Date().toISOString(),
           migrated: true
         }
-        savePosts(posts)
-        return posts[index]
+        persistData()
+        return dbCache.posts[index]
       }
       return null
     },
     deletePost: (id) => {
-      const posts = loadPosts()
-      const index = posts.findIndex(p => p.id === id)
+      const index = dbCache.posts.findIndex(p => p.id === id)
       if (index !== -1) {
-        posts.splice(index, 1)
-        savePosts(posts)
+        dbCache.posts.splice(index, 1)
+        persistData()
         return true
       }
       return false
     },
-    getAllPosts: () => loadPosts()
+    getAllPosts: () => dbCache.posts
   }
 }
