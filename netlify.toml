@@ -6,6 +6,9 @@ publish = "dist"
 [dev]
 functions = "netlify/functions"
 
+[functions]
+timeout = 30
+
 # API ルーティング設定
 [[redirects]]
 from = "/api/notes/:category"
