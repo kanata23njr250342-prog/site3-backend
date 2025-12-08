@@ -1,27 +1,12 @@
 import Compressor from 'compressorjs'
 
 /**
- * ファイルを圧縮する（画像または動画）
- * @param {File} file - 圧縮対象のファイル
- * @param {Object} options - 圧縮オプション
- * @returns {Promise<{compressed: File, original: File, ratio: number, originalSize: number, compressedSize: number}>}
- */
-export async function compressImage(file, options = {}) {
-  // ファイルタイプを判定
-  if (file.type.startsWith('video/')) {
-    return compressVideo(file, options)
-  } else {
-    return compressImageFile(file, options)
-  }
-}
-
-/**
  * 画像ファイルを圧縮する
  * @param {File} file - 圧縮対象のファイル
  * @param {Object} options - 圧縮オプション
  * @returns {Promise<{compressed: File, original: File, ratio: number, originalSize: number, compressedSize: number}>}
  */
-async function compressImageFile(file, options = {}) {
+export async function compressImage(file, options = {}) {
   const {
     maxWidth = 1920,
     maxHeight = 1080,
@@ -69,103 +54,6 @@ async function compressImageFile(file, options = {}) {
 }
 
 /**
- * 動画ファイルを圧縮する（シンプル版：ビットレート削減）
- * @param {File} file - 圧縮対象の動画ファイル
- * @param {Object} options - 圧縮オプション
- * @returns {Promise<{compressed: File, original: File, ratio: number, originalSize: number, compressedSize: number}>}
- */
-async function compressVideo(file, options = {}) {
-  const { quality = 0.8 } = options
-  
-  console.log('🎬 Starting video compression:', {
-    name: file.name,
-    size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-    type: file.type
-  })
-
-  try {
-    console.log('⏳ Loading FFmpeg via import...')
-    
-    // FFmpeg.wasmをES6 importで読み込む
-    const { FFmpeg, fetchFile } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/+esm')
-    
-    const ffmpeg = new FFmpeg()
-    
-    // FFmpegの初期化
-    if (!ffmpeg.isLoaded()) {
-      console.log('⏳ Initializing FFmpeg...')
-      await ffmpeg.load({
-        coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js'
-      })
-    }
-
-    // ファイルをFFmpegに読み込む
-    const inputName = file.name
-    const outputName = `compressed_${Date.now()}.mp4`
-    
-    console.log('📥 Reading video file...')
-    const data = await file.arrayBuffer()
-    ffmpeg.writeFile(inputName, new Uint8Array(data))
-
-    // ビットレートを計算（品質に基づいて）
-    // quality 0.8 = 1000kbps, 0.5 = 500kbps, 1.0 = 1500kbps
-    const bitrate = Math.round(1000 * quality) + 'k'
-    
-    console.log(`🔄 Compressing with bitrate: ${bitrate}...`)
-    // 動画を圧縮（H.264コーデック、指定ビットレート）
-    await ffmpeg.exec([
-      '-i', inputName,
-      '-c:v', 'libx264',
-      '-preset', 'fast',
-      '-b:v', bitrate,
-      '-c:a', 'aac',
-      '-b:a', '96k',
-      outputName
-    ])
-
-    // 圧縮されたファイルを読み込む
-    console.log('📤 Reading compressed video...')
-    const compressedData = ffmpeg.readFile(outputName)
-    const compressedBlob = new Blob([compressedData.buffer], { type: 'video/mp4' })
-    const compressedFile = new File([compressedBlob], outputName, { type: 'video/mp4' })
-
-    // クリーンアップ
-    ffmpeg.deleteFile(inputName)
-    ffmpeg.deleteFile(outputName)
-
-    const originalSize = file.size
-    const compressedSize = compressedFile.size
-    const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1)
-
-    console.log('✅ Video compressed successfully:', {
-      originalSize: `${(originalSize / 1024 / 1024).toFixed(2)}MB`,
-      compressedSize: `${(compressedSize / 1024 / 1024).toFixed(2)}MB`,
-      ratio: `${ratio}%`
-    })
-
-    return {
-      compressed: compressedFile,
-      original: file,
-      ratio: parseFloat(ratio),
-      originalSize,
-      compressedSize
-    }
-  } catch (error) {
-    console.error('❌ Video compression failed:', error)
-    // FFmpeg読み込み失敗時は元ファイルを返す（圧縮スキップ）
-    console.warn('⚠️ Video compression skipped, using original file')
-    const originalSize = file.size
-    return {
-      compressed: file,
-      original: file,
-      ratio: 0,
-      originalSize,
-      compressedSize: originalSize
-    }
-  }
-}
-
-/**
  * ファイルサイズが制限を超えているかチェック
  * @param {File} file - チェック対象のファイル
  * @param {number} maxSizeMB - 最大サイズ（MB）
@@ -198,4 +86,89 @@ export function formatFileSize(bytes) {
 export function shouldCompress(file, thresholdMB = 5) {
   const thresholdBytes = thresholdMB * 1024 * 1024
   return file.size > thresholdBytes
+}
+
+/**
+ * 動画ファイルを圧縮する（オンラインAPIを使用）
+ * @param {File} file - 圧縮対象の動画ファイル
+ * @returns {Promise<{compressed: Blob, original: File, ratio: number, originalSize: number, compressedSize: number}>}
+ */
+export async function compressVideo(file) {
+  console.log('🎬 Starting video compression:', {
+    name: file.name,
+    size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+    type: file.type
+  })
+
+  // Cloudinary APIを使用して動画を圧縮
+  // 注：本番環境ではCloudinary APIキーを環境変数から取得する必要があります
+  const cloudinaryUrl = 'https://api.cloudinary.com/v1_1/demo/video/upload'
+
+  try {
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('upload_preset', 'demo') // デモプリセット（署名不要）
+    formData.append('quality', 'auto:good') // 自動品質調整
+    formData.append('fetch_format', 'auto') // 最適なフォーマットを自動選択
+    formData.append('resource_type', 'video')
+
+    const response = await fetch(cloudinaryUrl, {
+      method: 'POST',
+      body: formData
+    })
+
+    if (!response.ok) {
+      throw new Error(`Cloudinary API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.secure_url) {
+      throw new Error('Cloudinary returned no URL')
+    }
+
+    // 圧縮されたファイルをダウンロード
+    const compressedResponse = await fetch(data.secure_url)
+    const compressedBlob = await compressedResponse.blob()
+
+    const originalSize = file.size
+    const compressedSize = compressedBlob.size
+    const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1)
+
+    console.log('✅ Video compressed successfully:', {
+      originalSize: `${(originalSize / 1024 / 1024).toFixed(2)}MB`,
+      compressedSize: `${(compressedSize / 1024 / 1024).toFixed(2)}MB`,
+      ratio: `${ratio}%`,
+      url: data.secure_url
+    })
+
+    return {
+      compressed: compressedBlob,
+      original: file,
+      ratio: parseFloat(ratio),
+      originalSize,
+      compressedSize
+    }
+  } catch (error) {
+    console.error('❌ Video compression failed:', error)
+    throw error
+  }
+}
+
+/**
+ * ファイルが動画かどうかを判定
+ * @param {File} file - チェック対象のファイル
+ * @returns {boolean}
+ */
+export function isVideoFile(file) {
+  return file.type.startsWith('video/')
+}
+
+/**
+ * ファイルが画像かどうかを判定
+ * @param {File} file - チェック対象のファイル
+ * @returns {boolean}
+ */
+export function isImageFile(file) {
+  return file.type.startsWith('image/')
 }
