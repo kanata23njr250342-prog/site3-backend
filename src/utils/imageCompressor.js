@@ -1,12 +1,27 @@
 import Compressor from 'compressorjs'
 
 /**
- * 画像ファイルを圧縮する
+ * ファイルを圧縮する（画像または動画）
  * @param {File} file - 圧縮対象のファイル
  * @param {Object} options - 圧縮オプション
  * @returns {Promise<{compressed: File, original: File, ratio: number, originalSize: number, compressedSize: number}>}
  */
 export async function compressImage(file, options = {}) {
+  // ファイルタイプを判定
+  if (file.type.startsWith('video/')) {
+    return compressVideo(file, options)
+  } else {
+    return compressImageFile(file, options)
+  }
+}
+
+/**
+ * 画像ファイルを圧縮する
+ * @param {File} file - 圧縮対象のファイル
+ * @param {Object} options - 圧縮オプション
+ * @returns {Promise<{compressed: File, original: File, ratio: number, originalSize: number, compressedSize: number}>}
+ */
+async function compressImageFile(file, options = {}) {
   const {
     maxWidth = 1920,
     maxHeight = 1080,
@@ -51,6 +66,115 @@ export async function compressImage(file, options = {}) {
       }
     })
   })
+}
+
+/**
+ * 動画ファイルを圧縮する（シンプル版：ビットレート削減）
+ * @param {File} file - 圧縮対象の動画ファイル
+ * @param {Object} options - 圧縮オプション
+ * @returns {Promise<{compressed: File, original: File, ratio: number, originalSize: number, compressedSize: number}>}
+ */
+async function compressVideo(file, options = {}) {
+  const { quality = 0.8 } = options
+  
+  console.log('🎬 Starting video compression:', {
+    name: file.name,
+    size: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+    type: file.type
+  })
+
+  try {
+    // FFmpeg.wasmをスクリプトタグで動的に読み込む
+    const FFmpeg = window.FFmpeg?.FFmpeg
+    const fetchFile = window.FFmpeg?.fetchFile
+
+    if (!FFmpeg || !fetchFile) {
+      console.log('⏳ Loading FFmpeg libraries...')
+      
+      // FFmpeg coreスクリプトを読み込む
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js'
+        script.onload = resolve
+        script.onerror = reject
+        document.head.appendChild(script)
+      })
+
+      // FFmpegメインスクリプトを読み込む
+      await new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js'
+        script.onload = resolve
+        script.onerror = reject
+        document.head.appendChild(script)
+      })
+    }
+
+    const ffmpeg = new window.FFmpeg.FFmpeg()
+    
+    // FFmpegの初期化
+    if (!ffmpeg.isLoaded()) {
+      console.log('⏳ Initializing FFmpeg...')
+      await ffmpeg.load({
+        coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js'
+      })
+    }
+
+    // ファイルをFFmpegに読み込む
+    const inputName = file.name
+    const outputName = `compressed_${Date.now()}.mp4`
+    
+    console.log('📥 Reading video file...')
+    const data = await file.arrayBuffer()
+    ffmpeg.writeFile(inputName, new Uint8Array(data))
+
+    // ビットレートを計算（品質に基づいて）
+    // quality 0.8 = 1000kbps, 0.5 = 500kbps, 1.0 = 1500kbps
+    const bitrate = Math.round(1000 * quality) + 'k'
+    
+    console.log(`🔄 Compressing with bitrate: ${bitrate}...`)
+    // 動画を圧縮（H.264コーデック、指定ビットレート）
+    await ffmpeg.exec([
+      '-i', inputName,
+      '-c:v', 'libx264',
+      '-preset', 'fast',
+      '-b:v', bitrate,
+      '-c:a', 'aac',
+      '-b:a', '96k',
+      outputName
+    ])
+
+    // 圧縮されたファイルを読み込む
+    console.log('📤 Reading compressed video...')
+    const compressedData = ffmpeg.readFile(outputName)
+    const compressedBlob = new Blob([compressedData.buffer], { type: 'video/mp4' })
+    const compressedFile = new File([compressedBlob], outputName, { type: 'video/mp4' })
+
+    // クリーンアップ
+    ffmpeg.deleteFile(inputName)
+    ffmpeg.deleteFile(outputName)
+
+    const originalSize = file.size
+    const compressedSize = compressedFile.size
+    const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1)
+
+    console.log('✅ Video compressed successfully:', {
+      originalSize: `${(originalSize / 1024 / 1024).toFixed(2)}MB`,
+      compressedSize: `${(compressedSize / 1024 / 1024).toFixed(2)}MB`,
+      ratio: `${ratio}%`
+    })
+
+    return {
+      compressed: compressedFile,
+      original: file,
+      ratio: parseFloat(ratio),
+      originalSize,
+      compressedSize
+    }
+  } catch (error) {
+    console.error('❌ Video compression failed:', error)
+    throw new Error(`動画の圧縮に失敗しました: ${error.message}`)
+  }
 }
 
 /**
