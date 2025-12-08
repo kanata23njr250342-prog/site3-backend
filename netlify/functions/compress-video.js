@@ -54,24 +54,29 @@ export default async (req, context) => {
     })
 
     // CloudConvert APIを使用して動画を圧縮
-    // 注：CLOUDCONVERT_API_KEYを環境変数に設定する必要があります
-    const apiKey = process.env.CLOUDCONVERT_API_KEY
+    // 注：CLOUDCONVERT_API_KEY または VITE_CLOUDCONVERT_API_KEY を環境変数に設定する必要があります
+    const apiKey = process.env.CLOUDCONVERT_API_KEY || process.env.VITE_CLOUDCONVERT_API_KEY
     
     console.log('🔑 Checking API Key...')
+    console.log('🔑 CLOUDCONVERT_API_KEY:', process.env.CLOUDCONVERT_API_KEY ? '✅ set' : '❌ not set')
+    console.log('🔑 VITE_CLOUDCONVERT_API_KEY:', process.env.VITE_CLOUDCONVERT_API_KEY ? '✅ set' : '❌ not set')
+    
     if (!apiKey) {
-      console.warn('⚠️ CLOUDCONVERT_API_KEY not set, returning original file')
+      console.error('❌ No CloudConvert API key found in environment variables')
+      console.error('📋 Available env vars:', Object.keys(process.env).filter(k => k.includes('CLOUDCONVERT')))
       return new Response(JSON.stringify({
         success: false,
-        message: 'Video compression not available',
-        compressedData: fileData,
-        ratio: 0
+        message: 'Video compression not available (no API key)',
+        error: 'CLOUDCONVERT_API_KEY or VITE_CLOUDCONVERT_API_KEY not set'
       }), {
-        status: 200,
+        status: 400,
         headers: { 'Content-Type': 'application/json' }
       })
     }
 
     console.log('✅ API Key is set, proceeding with compression')
+    console.log('🔑 API Key length:', apiKey.length)
+    console.log('🔑 API Key first 20 chars:', apiKey.substring(0, 20) + '...')
 
     // CloudConvert APIを使用（form-dataで動画ファイルを送信）
     // Step 1: Base64をバイナリに変換
