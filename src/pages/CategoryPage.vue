@@ -930,7 +930,7 @@ onUnmounted(() => {
         <div
           class="canvas-content"
           :style="{
-            transform: `translate(${panX}px, ${panY}px) scale(${zoom})`
+            transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`
           }"
         >
           <!-- 作品表示 -->
