@@ -58,10 +58,9 @@ export default async (req, context) => {
       bytes[i] = binaryString.charCodeAt(i)
     }
 
-    // FormDataを作成
-    const FormData = require('form-data')
+    // FormDataを作成（Node.js 18.0.0以上）
     const formData = new FormData()
-    formData.append('file', Buffer.from(bytes), fileName)
+    formData.append('file', new Blob([Buffer.from(bytes)], { type: 'video/mp4' }), fileName)
     formData.append('output_format', 'mp4')
     formData.append('video_codec', 'h264')
     formData.append('crf', '28') // 品質（低いほど高品質）
@@ -72,8 +71,7 @@ export default async (req, context) => {
     const response = await fetch('https://api.cloudconvert.com/v2/convert', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        ...formData.getHeaders()
+        'Authorization': `Bearer ${apiKey}`
       },
       body: formData,
       timeout: 300000 // 5分のタイムアウト

@@ -47,6 +47,7 @@ const editingPost = ref(null)
 const newPostForm = ref({ title: '', file: null, preview: null })
 const isPostLoading = ref(false)
 const postLoadingMessage = ref('')
+const postLoadingProgress = ref(0)
 
 // ===== 画像拡大表示 =====
 const expandedImage = ref(null)
@@ -615,22 +616,27 @@ const addPost = async () => {
       if (userChoice) {
         isPostLoading.value = true
         postLoadingMessage.value = isVideo ? '動画を圧縮中...' : '画像を圧縮中...'
+        postLoadingProgress.value = 0
         try {
           console.log('🔄 Starting compression...')
           let compressionResult
           
           if (isVideo) {
             // 動画の圧縮
+            postLoadingProgress.value = 25
             compressionResult = await compressVideo(fileToUpload)
+            postLoadingProgress.value = 75
             // Blobをファイルに変換
             fileToUpload = new File([compressionResult.compressed], fileToUpload.name, { type: fileToUpload.type })
           } else {
             // 画像の圧縮
+            postLoadingProgress.value = 25
             compressionResult = await compressImage(fileToUpload, {
               quality: 0.8,
               maxWidth: 1920,
               maxHeight: 1080
             })
+            postLoadingProgress.value = 75
             fileToUpload = compressionResult.compressed
           }
           
@@ -660,22 +666,27 @@ const addPost = async () => {
       if (userChoice) {
         isPostLoading.value = true
         postLoadingMessage.value = isVideo ? '動画を圧縮中...' : '画像を圧縮中...'
+        postLoadingProgress.value = 0
         try {
           console.log('🔄 Starting compression...')
           let compressionResult
           
           if (isVideo) {
             // 動画の圧縮
+            postLoadingProgress.value = 25
             compressionResult = await compressVideo(fileToUpload)
+            postLoadingProgress.value = 75
             // Blobをファイルに変換
             fileToUpload = new File([compressionResult.compressed], fileToUpload.name, { type: fileToUpload.type })
           } else {
             // 画像の圧縮
+            postLoadingProgress.value = 25
             compressionResult = await compressImage(fileToUpload, {
               quality: 0.8,
               maxWidth: 1920,
               maxHeight: 1080
             })
+            postLoadingProgress.value = 75
             fileToUpload = compressionResult.compressed
           }
           
@@ -691,6 +702,7 @@ const addPost = async () => {
     }
 
     postLoadingMessage.value = '投稿中...'
+    postLoadingProgress.value = 85
     console.log('📝 Creating FormData with:', {
       title: newPostForm.value.title.trim(),
       category: props.name,
@@ -706,6 +718,7 @@ const addPost = async () => {
     console.log('🚀 Calling createPost...')
     const savedPost = await createPost(formData)
     console.log('✅ Post created successfully:', savedPost)
+    postLoadingProgress.value = 100
 
     postsByCategory.value[props.name].push({
       ...savedPost,
@@ -721,6 +734,7 @@ const addPost = async () => {
   } finally {
     isPostLoading.value = false
     postLoadingMessage.value = ''
+    postLoadingProgress.value = 0
   }
 }
 
@@ -1098,6 +1112,10 @@ onUnmounted(() => {
         <div v-if="isPostLoading" class="loading-container">
           <div class="spinner"></div>
           <p class="loading-message">{{ postLoadingMessage }}</p>
+          <div class="progress-bar-container">
+            <div class="progress-bar" :style="{ width: postLoadingProgress + '%' }"></div>
+          </div>
+          <p class="progress-text">{{ postLoadingProgress }}%</p>
         </div>
         
         <!-- フォーム（ローディング中は非表示） -->
@@ -1511,6 +1529,29 @@ onUnmounted(() => {
   color: #545454;
   font-weight: 600;
   margin: 0;
+}
+
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background: #f0f0f0;
+  border-radius: 4px;
+  overflow: hidden;
+  margin: 1rem 0 0.5rem 0;
+}
+
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #545454, #3d3d3d);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  font-size: 0.85rem;
+  color: #888;
+  margin: 0;
+  text-align: center;
 }
 
 /* 画像拡大表示 */
