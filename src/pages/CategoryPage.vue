@@ -448,38 +448,47 @@ const addNote = async () => {
       authorid: getCurrentUserId()
     }
     
-    // フロントエンド用のメモオブジェクト（UI表示用）
-    const noteDataForUI = {
-      id: Date.now().toString(),
-      category: props.name,
-      x: contextMenu.value.canvasX,
-      y: contextMenu.value.canvasY,
-      width: 200,
-      height: 200,
-      content: newNoteForm.value.content.trim(),
-      author: newNoteForm.value.author?.trim() || '匿名',
-      color: getRandomColor(),
-      createdat: new Date().toISOString(),
-      updatedat: new Date().toISOString(),
-      isOwn: true,
-      postid: isPostView ? currentPost.value.id : undefined,
-      isexample: false,
-      migrated: true,
-      authorid: getCurrentUserId()
-    }
-    
     if (isPostView) {
+      // 投稿作品のメモ：Supabaseに保存
       const savedNote = await createNote(noteDataForDB)
-      // Supabaseから返されたデータ（postid, id等）とUIデータをマージ
-      // UIプロパティ（color, width, height, author）を優先して保持
-      notes.value.push({
+      
+      // Supabaseから返されたデータを使用（IDはSupabaseが管理）
+      const noteDataForUI = {
         ...savedNote,  // Supabaseから返されたデータ（id, postid等）
-        ...noteDataForUI,  // UIプロパティ（color, width, height, author等）で上書き
+        // UI用プロパティを追加
+        width: 200,
+        height: 200,
+        color: getRandomColor(),
+        author: newNoteForm.value.author?.trim() || '匿名',
         isOwn: true,
         isexample: false
-      })
-    } else {
+      }
+      
       notes.value.push(noteDataForUI)
+      console.log('✅ Note created and added:', { id: savedNote.id, author: noteDataForUI.author })
+    } else {
+      // 作品例のメモ：フロントエンドのみ
+      const noteDataForUI = {
+        id: Date.now().toString(),
+        category: props.name,
+        x: contextMenu.value.canvasX,
+        y: contextMenu.value.canvasY,
+        width: 200,
+        height: 200,
+        content: newNoteForm.value.content.trim(),
+        author: newNoteForm.value.author?.trim() || '匿名',
+        color: getRandomColor(),
+        createdat: new Date().toISOString(),
+        updatedat: new Date().toISOString(),
+        isOwn: true,
+        postid: undefined,
+        isexample: false,
+        migrated: true,
+        authorid: getCurrentUserId()
+      }
+      
+      notes.value.push(noteDataForUI)
+      console.log('✅ Example note added:', { id: noteDataForUI.id, author: noteDataForUI.author })
     }
     
     showNoteDialog.value = false
