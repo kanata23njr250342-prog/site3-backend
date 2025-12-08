@@ -646,9 +646,9 @@ const addPost = async () => {
         console.log('✅ WebM conversion complete')
       } catch (conversionError) {
         console.error('❌ WebM conversion failed:', conversionError)
-        isPostLoading.value = false
-        alert('WebM形式への変換に失敗しました。')
-        return
+        alert('WebM形式への変換に失敗しました。元のファイルで投稿を続行します。')
+        // WebM変換失敗時は元ファイルで続行（ローディング表示は継続）
+        postLoadingProgress.value = 80
       }
     } else {
       postLoadingMessage.value = 'WebP形式に変換中...'
@@ -660,9 +660,9 @@ const addPost = async () => {
         console.log('✅ WebP conversion complete')
       } catch (conversionError) {
         console.error('❌ WebP conversion failed:', conversionError)
-        isPostLoading.value = false
-        alert('WebP形式への変換に失敗しました。')
-        return
+        alert('WebP形式への変換に失敗しました。元のファイルで投稿を続行します。')
+        // WebP変換失敗時は元ファイルで続行（ローディング表示は継続）
+        postLoadingProgress.value = 80
       }
     }
 

@@ -148,7 +148,7 @@ export async function convertToWebP(file, quality = 0.8) {
 
 /**
  * 動画をWebM形式に変換する
- * FFmpeg.wasmを使用してブラウザ側で変換
+ * 注：FFmpeg.wasmのCDN読み込みが不安定なため、現在は元ファイルをそのまま返す
  * @param {File} file - 変換対象の動画ファイル
  * @returns {Promise<File>}
  */
@@ -160,57 +160,11 @@ export async function convertToWebM(file) {
       type: file.type
     })
 
-    // FFmpeg.wasmをロード
-    const { FFmpeg, fetchFile } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.mjs')
+    // FFmpeg.wasmのCDN読み込みが不安定なため、元ファイルをそのまま返す
+    // 将来的には、バックエンド側でFFmpegを使用してWebM変換を実装することを推奨
+    console.warn('⚠️ WebM conversion not available, using original file')
     
-    const ffmpeg = new FFmpeg()
-    
-    // FFmpegの初期化
-    if (!ffmpeg.isLoaded()) {
-      console.log('📥 Loading FFmpeg...')
-      await ffmpeg.load({
-        coreURL: 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.10/dist/esm/ffmpeg-core.js'
-      })
-    }
-
-    // ファイルをFFmpegのファイルシステムに書き込み
-    console.log('📝 Writing file to FFmpeg filesystem...')
-    const inputFileName = file.name
-    const outputFileName = file.name.replace(/\.[^.]+$/, '.webm')
-    
-    await ffmpeg.writeFile(inputFileName, await fetchFile(file))
-
-    // WebM形式に変換
-    console.log('🔄 Converting to WebM...')
-    await ffmpeg.exec([
-      '-i', inputFileName,
-      '-c:v', 'libvpx-vp9',
-      '-crf', '30',
-      '-b:v', '0',
-      '-c:a', 'libopus',
-      outputFileName
-    ])
-
-    // 変換されたファイルを読み込み
-    console.log('📤 Reading converted file...')
-    const data = await ffmpeg.readFile(outputFileName)
-    const webmBlob = new Blob([data.buffer], { type: 'video/webm' })
-
-    // ファイルシステムをクリーンアップ
-    await ffmpeg.deleteFile(inputFileName)
-    await ffmpeg.deleteFile(outputFileName)
-
-    const webmFile = new File([webmBlob], outputFileName, {
-      type: 'video/webm'
-    })
-
-    console.log('✅ Video converted to WebM:', {
-      originalSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
-      webmSize: `${(webmBlob.size / 1024 / 1024).toFixed(2)}MB`,
-      reduction: `${((1 - webmBlob.size / file.size) * 100).toFixed(1)}%`
-    })
-
-    return webmFile
+    return file
   } catch (error) {
     console.error('❌ WebM conversion failed:', error)
     throw error
