@@ -12,52 +12,9 @@ VITE_SUPABASE_ANON_KEY = "sb_publishable_RoGIEnAS8977W74YIA5o_g_Ajol_JpW"
 [dev]
 functions = "netlify/functions"
 
-# API ルーティング設定
-[[redirects]]
-from = "/api/notes/:category"
-to = "/.netlify/functions/notes-get"
-status = 200
-force = true
-
-[[redirects]]
-from = "/api/notes"
-to = "/.netlify/functions/notes-post"
-status = 200
-force = true
-
-[[redirects]]
-from = "/api/notes/:id"
-to = "/.netlify/functions/notes-put"
-status = 200
-force = true
-
-[[redirects]]
-from = "/api/posts/:category"
-to = "/.netlify/functions/posts-get"
-status = 200
-force = true
-
-[[redirects]]
-from = "/api/posts"
-to = "/.netlify/functions/posts-post"
-status = 200
-force = true
-
-[[redirects]]
-from = "/api/posts/:id"
-to = "/.netlify/functions/posts-put"
-status = 200
-force = true
-
-[[redirects]]
-from = "/api/posts/:id"
-to = "/.netlify/functions/posts-delete"
-status = 200
-force = true
-method = "DELETE"
-
 # SPA用のキャッチオールリダイレクト
-# すべてのルートをindex.htmlにリダイレクト（APIリクエスト除外）
+# すべてのルートをindex.htmlにリダイレクト
+# フロントエンドはSupabaseと直接通信するため、Netlify Functionsへのリダイレクトは不要
 [[redirects]]
 from = "/*"
 to = "/index.html"
