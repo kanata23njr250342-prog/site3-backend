@@ -1,24 +1,40 @@
+import FormData from 'form-data'
+import { Readable } from 'stream'
+
 /**
  * 動画圧縮エンドポイント
  * バックエンド側で動画を圧縮し、圧縮されたBase64データを返す
  * CloudConvert APIを使用（環境変数 CLOUDCONVERT_API_KEY が必要）
  */
 export default async (req, context) => {
+  console.log('🔵 compress-video function called')
+  console.log('📋 Request method:', req.method)
+  
   if (req.method !== 'POST') {
+    console.error('❌ Invalid method:', req.method)
     return new Response('Method not allowed', { status: 405 })
   }
 
   try {
+    console.log('📖 Reading request body...')
     let bodyText = req.body
     
     // req.bodyがストリームの場合は読み込む
     if (typeof bodyText !== 'string') {
+      console.log('📦 Body is not a string, converting from buffer...')
       const buffer = await req.arrayBuffer()
       bodyText = new TextDecoder().decode(buffer)
+      console.log('✅ Buffer converted to string, length:', bodyText.length)
     }
     
+    console.log('🔍 Parsing JSON body...')
     const body = JSON.parse(bodyText)
     const { fileData, fileName } = body
+
+    console.log('📊 Extracted data:', {
+      fileData: fileData ? `${fileData.length} chars` : 'missing',
+      fileName: fileName || 'missing'
+    })
 
     if (!fileData || !fileName) {
       console.error('❌ Missing required fields:', { fileData: !!fileData, fileName: !!fileName })
@@ -41,6 +57,7 @@ export default async (req, context) => {
     // 注：CLOUDCONVERT_API_KEYを環境変数に設定する必要があります
     const apiKey = process.env.CLOUDCONVERT_API_KEY
     
+    console.log('🔑 Checking API Key...')
     if (!apiKey) {
       console.warn('⚠️ CLOUDCONVERT_API_KEY not set, returning original file')
       return new Response(JSON.stringify({
@@ -54,58 +71,80 @@ export default async (req, context) => {
       })
     }
 
-    console.log('🔑 API Key is set, proceeding with compression')
+    console.log('✅ API Key is set, proceeding with compression')
 
-    // CloudConvert Job APIを使用
-    // Step 1: ジョブを作成
-    console.log('📝 Creating CloudConvert job...')
+    // CloudConvert APIを使用（form-dataで動画ファイルを送信）
+    // Step 1: Base64をバイナリに変換
+    console.log('🔄 Converting Base64 to binary...')
+    const binaryString = Buffer.from(fileData, 'base64').toString('binary')
+    const bytes = new Uint8Array(binaryString.length)
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i)
+    }
+    const buffer = Buffer.from(bytes)
+    console.log('✅ Binary conversion complete, size:', buffer.length)
+
+    // Step 2: FormDataを作成
+    console.log('📝 Creating FormData...')
+    const form = new FormData()
     
-    const jobResponse = await fetch('https://api.cloudconvert.com/v2/jobs', {
+    // ファイルをストリームとして追加
+    const stream = Readable.from(buffer)
+    form.append('file', stream, {
+      filename: fileName,
+      contentType: 'video/mp4'
+    })
+    form.append('output_format', 'mp4')
+    form.append('video_codec', 'h264')
+    form.append('crf', '28')
+    form.append('preset', 'fast')
+    
+    console.log('✅ FormData created')
+
+    // Step 3: CloudConvert APIに送信
+    console.log('📤 Sending to CloudConvert API...')
+    console.log('🔗 URL: https://api.cloudconvert.com/v2/convert')
+    console.log('🔑 Authorization: Bearer [API_KEY]')
+    
+    const jobResponse = await fetch('https://api.cloudconvert.com/v2/convert', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
+        ...form.getHeaders()
       },
-      body: JSON.stringify({
-        tasks: {
-          'import-my-file': {
-            operation: 'import/base64',
-            file: fileData,
-            filename: fileName
-          },
-          'convert-my-file': {
-            operation: 'convert',
-            input: 'import-my-file',
-            output_format: 'mp4',
-            video_codec: 'h264',
-            crf: 28,
-            preset: 'fast'
-          },
-          'export-my-file': {
-            operation: 'export/url',
-            input: 'convert-my-file'
-          }
-        }
-      })
+      body: form,
+      timeout: 300000 // 5分
     })
+
+    console.log('📥 Response status:', jobResponse.status)
 
     if (!jobResponse.ok) {
       const errorText = await jobResponse.text()
-      console.error('❌ CloudConvert job creation error:', jobResponse.status, errorText)
-      throw new Error(`CloudConvert job creation failed: ${jobResponse.status}`)
+      console.error('❌ CloudConvert API error:', jobResponse.status)
+      console.error('📝 Error details:', errorText)
+      throw new Error(`CloudConvert API error: ${jobResponse.status} - ${errorText}`)
     }
 
     const jobData = await jobResponse.json()
-    const jobId = jobData.data.id
+    console.log('✅ CloudConvert response received')
+    console.log('📊 Response data:', JSON.stringify(jobData, null, 2))
+    
+    const jobId = jobData.data?.id
+    if (!jobId) {
+      console.error('❌ No job ID in response')
+      throw new Error('No job ID returned from CloudConvert')
+    }
 
     console.log('✅ Job created:', jobId)
 
     // Step 2: ジョブの完了を待つ（ポーリング）
+    console.log('⏳ Waiting for job completion...')
     let jobStatus = 'processing'
     let maxAttempts = 60 // 最大60回（約5分）
     let attempts = 0
 
     while (jobStatus === 'processing' && attempts < maxAttempts) {
+      console.log(`⏳ Polling... (attempt ${attempts + 1}/${maxAttempts})`)
       await new Promise(resolve => setTimeout(resolve, 5000)) // 5秒待機
 
       const statusResponse = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
@@ -115,44 +154,56 @@ export default async (req, context) => {
       })
 
       if (!statusResponse.ok) {
+        console.error('❌ Failed to check job status:', statusResponse.status)
         throw new Error(`Failed to check job status: ${statusResponse.status}`)
       }
 
       const statusData = await statusResponse.json()
       jobStatus = statusData.data.status
 
-      console.log(`⏳ Job status: ${jobStatus} (attempt ${attempts + 1}/${maxAttempts})`)
+      console.log(`📊 Job status: ${jobStatus} (attempt ${attempts + 1}/${maxAttempts})`)
 
       attempts++
     }
 
     if (jobStatus !== 'finished') {
+      console.error('❌ Job did not complete:', jobStatus)
       throw new Error(`Job did not complete: ${jobStatus}`)
     }
 
-    console.log('✅ Job completed')
+    console.log('✅ Job completed successfully')
 
     // Step 3: 出力ファイルをダウンロード
+    console.log('📥 Fetching final job data...')
     const finalJobResponse = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
       headers: {
         'Authorization': `Bearer ${apiKey}`
       }
     })
 
+    if (!finalJobResponse.ok) {
+      console.error('❌ Failed to fetch final job data:', finalJobResponse.status)
+      throw new Error(`Failed to fetch final job data: ${finalJobResponse.status}`)
+    }
+
     const finalJobData = await finalJobResponse.json()
+    console.log('📊 Final job data:', JSON.stringify(finalJobData, null, 2))
+    
     const exportTask = finalJobData.data.tasks.find(t => t.name === 'export-my-file')
 
     if (!exportTask || !exportTask.result || !exportTask.result.files || exportTask.result.files.length === 0) {
+      console.error('❌ No output file found in job result')
       throw new Error('No output file found in job result')
     }
 
     const downloadUrl = exportTask.result.files[0].url
 
-    console.log('📥 Downloading compressed video...')
+    console.log('📥 Downloading compressed video from:', downloadUrl)
 
     const downloadResponse = await fetch(downloadUrl)
 
     if (!downloadResponse.ok) {
+      console.error('❌ Download failed:', downloadResponse.status)
       throw new Error(`Download failed: ${downloadResponse.status}`)
     }
 
@@ -181,7 +232,8 @@ export default async (req, context) => {
     })
   } catch (error) {
     console.error('❌ Video compression error:', error.message)
-    console.error('Stack:', error.stack)
+    console.error('📋 Error type:', error.constructor.name)
+    console.error('📋 Stack:', error.stack)
     
     // エラー時は失敗を返す
     return new Response(JSON.stringify({
