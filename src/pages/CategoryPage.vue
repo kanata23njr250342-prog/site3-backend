@@ -304,7 +304,6 @@ const handleCanvasMouseMove = (e) => {
       const cumulativeDeltaY = e.clientY - rightClickStartY.value
       
       // 累積移動距離に基づいてズームレベルを計算
-      // 上方向（負）で拡大、下方向（正）で縮小
       const zoomChangePerPixel = 0.001
       const targetZoom = rightClickStartZoom.value * Math.exp(-cumulativeDeltaY * zoomChangePerPixel)
       
@@ -312,20 +311,19 @@ const handleCanvasMouseMove = (e) => {
         // 右クリックズーム: 画面の中心を基準にズーム
         const canvasRect = canvasContainer.value?.getBoundingClientRect()
         if (canvasRect) {
-          const screenCenterX = canvasRect.width / 2
-          const screenCenterY = canvasRect.height / 2
+          const centerX = canvasRect.width / 2
+          const centerY = canvasRect.height / 2
           
-          // ズーム比率（開始時からの相対値）
-          const zoomRatio = targetZoom / rightClickStartZoom.value
+          // 画面中心のキャンバス座標を計算（開始時のズーム/パンで）
+          const centerCanvasX = (0 - rightClickStartPanX.value) / rightClickStartZoom.value
+          const centerCanvasY = (0 - rightClickStartPanY.value) / rightClickStartZoom.value
           
-          // パン調整（画面中心を基準に）
-          const panDeltaX = screenCenterX * (1 - zoomRatio)
-          const panDeltaY = screenCenterY * (1 - zoomRatio)
+          // 画面中心が同じキャンバス座標を指すようにパンを計算
+          const newPanX = -centerCanvasX * targetZoom
+          const newPanY = -centerCanvasY * targetZoom
           
-          // パン値を開始時の値から計算（毎フレーム加算ではなく）
-          panX.value = rightClickStartPanX.value + panDeltaX
-          panY.value = rightClickStartPanY.value + panDeltaY
-          
+          panX.value = newPanX
+          panY.value = newPanY
           zoom.value = targetZoom
         }
       }
@@ -376,6 +374,15 @@ const handleCanvasMouseUp = (e) => {
 const handleCanvasWheel = (e) => {
   e.preventDefault()
   
+  const canvasRect = canvasContainer.value?.getBoundingClientRect()
+  if (!canvasRect) return
+  
+  // カーソル位置（キャンバスコンテナ相対）
+  const cursorScreenX = e.clientX - canvasRect.left
+  const cursorScreenY = e.clientY - canvasRect.top
+  const centerX = canvasRect.width / 2
+  const centerY = canvasRect.height / 2
+  
   // スクロール開始時の値を記録（最初のスクロール時のみ）
   if (wheelCumulativeDelta === 0) {
     wheelStartZoom = zoom.value
@@ -387,36 +394,23 @@ const handleCanvasWheel = (e) => {
   wheelCumulativeDelta += e.deltaY
   
   // 累積スクロール量に基づいてズームレベルを計算
-  // 上方向（負）で拡大、下方向（正）で縮小
   const zoomChangePerPixel = 0.001
   const targetZoom = wheelStartZoom * Math.exp(-wheelCumulativeDelta * zoomChangePerPixel)
   
   if (targetZoom >= 0.5 && targetZoom <= 5) {
-    // 中ボタンスクロール: カーソル位置を中心にズーム
-    const canvasRect = canvasContainer.value?.getBoundingClientRect()
-    if (canvasRect) {
-      const cursorX = e.clientX - canvasRect.left
-      const cursorY = e.clientY - canvasRect.top
-      const centerX = canvasRect.width / 2
-      const centerY = canvasRect.height / 2
-      
-      // カーソルからの相対位置
-      const relX = cursorX - centerX
-      const relY = cursorY - centerY
-      
-      // ズーム比率（開始時からの相対値）
-      const zoomRatio = targetZoom / wheelStartZoom
-      
-      // パン調整（カーソル位置を中心に）
-      const panDeltaX = relX * (1 - zoomRatio)
-      const panDeltaY = relY * (1 - zoomRatio)
-      
-      // パン値を開始時の値から計算（毎フレーム加算ではなく）
-      panX.value = wheelStartPanX + panDeltaX
-      panY.value = wheelStartPanY + panDeltaY
-      
-      zoom.value = targetZoom
-    }
+    // カーソル位置のキャンバス座標を計算（開始時のズーム/パンで）
+    const cursorCanvasX = (cursorScreenX - centerX - wheelStartPanX) / wheelStartZoom
+    const cursorCanvasY = (cursorScreenY - centerY - wheelStartPanY) / wheelStartZoom
+    
+    // 新しいズームで同じキャンバス座標がカーソル位置に来るようにパンを計算
+    // cursorScreenX - centerX = cursorCanvasX * targetZoom + newPanX
+    // newPanX = cursorScreenX - centerX - cursorCanvasX * targetZoom
+    const newPanX = cursorScreenX - centerX - cursorCanvasX * targetZoom
+    const newPanY = cursorScreenY - centerY - cursorCanvasY * targetZoom
+    
+    panX.value = newPanX
+    panY.value = newPanY
+    zoom.value = targetZoom
   }
   
   // スクロール終了時に累積値をリセット（スクロール停止を検出）
@@ -1270,7 +1264,7 @@ onUnmounted(() => {
 }
 
 .artwork-display {
-  position: fixed;
+  position: absolute;
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%);
