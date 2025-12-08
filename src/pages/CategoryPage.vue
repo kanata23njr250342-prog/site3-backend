@@ -12,7 +12,7 @@ import { fetchPosts, createPost, updatePost, deletePost as deletePostApi } from 
 import { loadDeletedExampleNoteIds, saveDeletedExampleNoteIds } from '../utils/storage.js'
 import { screenToCanvas } from '../utils/coordinates.js'
 import { getCurrentUserId, isCurrentUser } from '../utils/auth.js'
-import { compressImage, isFileTooLarge, shouldCompress, formatFileSize, convertToWebP } from '../utils/imageCompressor.js'
+import { compressImage, isFileTooLarge, shouldCompress, formatFileSize, convertToWebP, convertToWebM, isVideoFile, isImageFile } from '../utils/imageCompressor.js'
 
 const router = useRouter()
 const props = defineProps({
@@ -597,6 +597,7 @@ const addPost = async () => {
   try {
     let fileToUpload = newPostForm.value.file
     const originalSize = fileToUpload.size
+    const isVideo = isVideoFile(fileToUpload)
 
     // ファイルサイズチェック（最大10MB）
     if (isFileTooLarge(fileToUpload, 10)) {
@@ -605,8 +606,8 @@ const addPost = async () => {
       return
     }
 
-    // 圧縮が推奨される場合（5MB以上10MB未満）
-    if (shouldCompress(fileToUpload, 5)) {
+    // 圧縮が推奨される場合（5MB以上10MB未満、画像のみ）
+    if (!isVideo && shouldCompress(fileToUpload, 5)) {
       console.log('💾 File size suggests compression')
       isPostLoading.value = true
       postLoadingMessage.value = '画像を圧縮中...'
@@ -633,20 +634,36 @@ const addPost = async () => {
       }
     }
 
-    // WebP形式に変換
+    // ファイル形式に応じた変換
     isPostLoading.value = true
-    postLoadingMessage.value = 'WebP形式に変換中...'
-    postLoadingProgress.value = 60
-    try {
-      console.log('🔄 Converting to WebP...')
-      fileToUpload = await convertToWebP(fileToUpload, 0.8)
-      postLoadingProgress.value = 80
-      console.log('✅ WebP conversion complete')
-    } catch (conversionError) {
-      console.error('❌ WebP conversion failed:', conversionError)
-      isPostLoading.value = false
-      alert('WebP形式への変換に失敗しました。')
-      return
+    if (isVideo) {
+      postLoadingMessage.value = 'WebM形式に変換中...'
+      postLoadingProgress.value = 60
+      try {
+        console.log('🔄 Converting to WebM...')
+        fileToUpload = await convertToWebM(fileToUpload)
+        postLoadingProgress.value = 80
+        console.log('✅ WebM conversion complete')
+      } catch (conversionError) {
+        console.error('❌ WebM conversion failed:', conversionError)
+        isPostLoading.value = false
+        alert('WebM形式への変換に失敗しました。')
+        return
+      }
+    } else {
+      postLoadingMessage.value = 'WebP形式に変換中...'
+      postLoadingProgress.value = 60
+      try {
+        console.log('🔄 Converting to WebP...')
+        fileToUpload = await convertToWebP(fileToUpload, 0.8)
+        postLoadingProgress.value = 80
+        console.log('✅ WebP conversion complete')
+      } catch (conversionError) {
+        console.error('❌ WebP conversion failed:', conversionError)
+        isPostLoading.value = false
+        alert('WebP形式への変換に失敗しました。')
+        return
+      }
     }
 
     postLoadingMessage.value = '投稿中...'
