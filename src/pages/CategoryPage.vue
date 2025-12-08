@@ -429,23 +429,30 @@ const addNote = async () => {
     return
   }
 
-  if (!contextMenu.value || contextMenu.value.canvasX === undefined) {
-    alert('メモを配置する位置を選択してください')
-    return
-  }
-
   try {
     const isPostView = currentViewIndex.value !== -1 && currentPost.value
+    
+    // メモを画面中央に配置するための座標計算
+    // 画面中央のスクリーン座標
+    const screenCenterX = canvasContainer.value?.clientWidth / 2 || 0
+    const screenCenterY = canvasContainer.value?.clientHeight / 2 || 0
+    
+    // スクリーン座標をキャンバス座標に変換
+    const canvasX = (screenCenterX - panX.value) / zoom.value
+    const canvasY = (screenCenterY - panY.value) / zoom.value
+    
+    console.log('📍 Adding note at canvas center:', { canvasX, canvasY, zoom: zoom.value, panX: panX.value, panY: panY.value })
     
     // Supabaseに送信するデータ（必要なカラムのみ）
     const noteDataForDB = {
       category: props.name,
-      x: contextMenu.value.canvasX,
-      y: contextMenu.value.canvasY,
+      x: canvasX,
+      y: canvasY,
       content: newNoteForm.value.content.trim(),
       postid: isPostView ? currentPost.value.id : undefined,
       isexample: false,
-      authorid: getCurrentUserId()
+      authorid: getCurrentUserId(),
+      author: newNoteForm.value.author?.trim() || '匿名'  // 名前を保存
     }
     
     if (isPostView) {
