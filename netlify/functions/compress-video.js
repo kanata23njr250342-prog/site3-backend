@@ -21,8 +21,11 @@ export default async (req, context) => {
     const { fileData, fileName } = body
 
     if (!fileData || !fileName) {
-      console.error('❌ Missing required fields')
-      return new Response(JSON.stringify({ error: 'Missing fileData or fileName' }), {
+      console.error('❌ Missing required fields:', { fileData: !!fileData, fileName: !!fileName })
+      return new Response(JSON.stringify({ 
+        error: 'Missing fileData or fileName',
+        received: { fileData: !!fileData, fileName: !!fileName }
+      }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' }
       })
@@ -30,7 +33,8 @@ export default async (req, context) => {
 
     console.log('🎬 Starting video compression on backend:', {
       fileName,
-      fileDataLength: fileData.length
+      fileDataLength: fileData.length,
+      fileDataType: typeof fileData
     })
 
     // CloudConvert APIを使用して動画を圧縮
@@ -50,82 +54,131 @@ export default async (req, context) => {
       })
     }
 
-    // CloudConvert APIで動画を圧縮
-    // Base64をバイナリに変換
-    const binaryString = Buffer.from(fileData, 'base64').toString('binary')
-    const bytes = new Uint8Array(binaryString.length)
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i)
-    }
+    console.log('🔑 API Key is set, proceeding with compression')
 
-    // FormDataを作成（Node.js 18.0.0以上）
-    const formData = new FormData()
-    formData.append('file', new Blob([Buffer.from(bytes)], { type: 'video/mp4' }), fileName)
-    formData.append('output_format', 'mp4')
-    formData.append('video_codec', 'h264')
-    formData.append('crf', '28') // 品質（低いほど高品質）
-    formData.append('preset', 'fast') // エンコード速度
-
-    console.log('📤 Sending to CloudConvert API...')
-
-    const response = await fetch('https://api.cloudconvert.com/v2/convert', {
+    // CloudConvert Job APIを使用
+    // Step 1: ジョブを作成
+    console.log('📝 Creating CloudConvert job...')
+    
+    const jobResponse = await fetch('https://api.cloudconvert.com/v2/jobs', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
       },
-      body: formData,
-      timeout: 300000 // 5分のタイムアウト
+      body: JSON.stringify({
+        tasks: {
+          'import-my-file': {
+            operation: 'import/base64',
+            file: fileData,
+            filename: fileName
+          },
+          'convert-my-file': {
+            operation: 'convert',
+            input: 'import-my-file',
+            output_format: 'mp4',
+            video_codec: 'h264',
+            crf: 28,
+            preset: 'fast'
+          },
+          'export-my-file': {
+            operation: 'export/url',
+            input: 'convert-my-file'
+          }
+        }
+      })
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('❌ CloudConvert API error:', response.status, errorText)
-      throw new Error(`CloudConvert API error: ${response.status}`)
+    if (!jobResponse.ok) {
+      const errorText = await jobResponse.text()
+      console.error('❌ CloudConvert job creation error:', jobResponse.status, errorText)
+      throw new Error(`CloudConvert job creation failed: ${jobResponse.status}`)
     }
 
-    const data = await response.json()
+    const jobData = await jobResponse.json()
+    const jobId = jobData.data.id
 
-    if (data.status === 'completed' && data.output && data.output[0]) {
-      const downloadUrl = data.output[0].url
-      
-      console.log('📥 Downloading compressed video...')
-      
-      // 圧縮されたファイルをダウンロード
-      const downloadResponse = await fetch(downloadUrl, {
-        timeout: 60000
+    console.log('✅ Job created:', jobId)
+
+    // Step 2: ジョブの完了を待つ（ポーリング）
+    let jobStatus = 'processing'
+    let maxAttempts = 60 // 最大60回（約5分）
+    let attempts = 0
+
+    while (jobStatus === 'processing' && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000)) // 5秒待機
+
+      const statusResponse = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        }
       })
 
-      if (!downloadResponse.ok) {
-        throw new Error(`Download failed: ${downloadResponse.status}`)
+      if (!statusResponse.ok) {
+        throw new Error(`Failed to check job status: ${statusResponse.status}`)
       }
 
-      const compressedBuffer = await downloadResponse.buffer()
-      const compressedBase64 = compressedBuffer.toString('base64')
-      
-      const originalSize = Buffer.byteLength(fileData, 'base64')
-      const compressedSize = compressedBuffer.length
-      const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1)
+      const statusData = await statusResponse.json()
+      jobStatus = statusData.data.status
 
-      console.log('✅ Video compressed successfully:', {
-        originalSize: `${(originalSize / 1024 / 1024).toFixed(2)}MB`,
-        compressedSize: `${(compressedSize / 1024 / 1024).toFixed(2)}MB`,
-        ratio: `${ratio}%`
-      })
+      console.log(`⏳ Job status: ${jobStatus} (attempt ${attempts + 1}/${maxAttempts})`)
 
-      return new Response(JSON.stringify({
-        success: true,
-        compressedData: compressedBase64,
-        ratio: parseFloat(ratio),
-        originalSize,
-        compressedSize
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      })
-    } else {
-      console.error('❌ CloudConvert job not completed:', data)
-      throw new Error('CloudConvert compression not completed')
+      attempts++
     }
+
+    if (jobStatus !== 'finished') {
+      throw new Error(`Job did not complete: ${jobStatus}`)
+    }
+
+    console.log('✅ Job completed')
+
+    // Step 3: 出力ファイルをダウンロード
+    const finalJobResponse = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
+      headers: {
+        'Authorization': `Bearer ${apiKey}`
+      }
+    })
+
+    const finalJobData = await finalJobResponse.json()
+    const exportTask = finalJobData.data.tasks.find(t => t.name === 'export-my-file')
+
+    if (!exportTask || !exportTask.result || !exportTask.result.files || exportTask.result.files.length === 0) {
+      throw new Error('No output file found in job result')
+    }
+
+    const downloadUrl = exportTask.result.files[0].url
+
+    console.log('📥 Downloading compressed video...')
+
+    const downloadResponse = await fetch(downloadUrl)
+
+    if (!downloadResponse.ok) {
+      throw new Error(`Download failed: ${downloadResponse.status}`)
+    }
+
+    const compressedBuffer = await downloadResponse.arrayBuffer()
+    const compressedBase64 = Buffer.from(compressedBuffer).toString('base64')
+    
+    const originalSize = Buffer.byteLength(fileData, 'base64')
+    const compressedSize = Buffer.byteLength(compressedBase64, 'base64')
+    const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1)
+
+    console.log('✅ Video compressed successfully:', {
+      originalSize: `${(originalSize / 1024 / 1024).toFixed(2)}MB`,
+      compressedSize: `${(compressedSize / 1024 / 1024).toFixed(2)}MB`,
+      ratio: `${ratio}%`
+    })
+
+    return new Response(JSON.stringify({
+      success: true,
+      compressedData: compressedBase64,
+      ratio: parseFloat(ratio),
+      originalSize,
+      compressedSize
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    })
   } catch (error) {
     console.error('❌ Video compression error:', error.message)
     console.error('Stack:', error.stack)
