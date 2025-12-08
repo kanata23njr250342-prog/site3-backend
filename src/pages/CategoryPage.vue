@@ -338,23 +338,26 @@ const handleCanvasMouseUp = (e) => {
     isDragging.value = false
   } else if (rightClickStartTime.value > 0 && !isRightClickDragging.value) {
     // 右クリックで長押しもドラッグもしなかった場合: コンテキストメニュー表示
-    const canvasContent = document.querySelector('.canvas-content')
-    if (!canvasContent) {
+    const canvasContainer_rect = canvasContainer.value?.getBoundingClientRect()
+    if (!canvasContainer_rect) {
       rightClickStartTime.value = 0
       return
     }
     
-    const rect = canvasContent.getBoundingClientRect()
-    const center = getCanvasCenter()
+    // スクリーン座標をキャンバス座標に変換
+    // rightClickStartX/Yはグローバルスクリーン座標なので、キャンバスコンテナ相対座標に変換
+    const screenX = rightClickStartX.value - canvasContainer_rect.left
+    const screenY = rightClickStartY.value - canvasContainer_rect.top
+    
+    // スクリーン中央座標
+    const screenCenterX = canvasContainer.value?.clientWidth / 2 || 0
+    const screenCenterY = canvasContainer.value?.clientHeight / 2 || 0
     
     const canvasCoords = screenToCanvas(
-      rightClickStartX.value - (canvasContainer.value?.getBoundingClientRect().left || 0),
-      rightClickStartY.value - (canvasContainer.value?.getBoundingClientRect().top || 0),
-      zoom.value,
-      panX.value,
-      panY.value,
-      center.x,
-      center.y
+      screenX, screenY,                // スクリーン座標（キャンバスコンテナ相対）
+      screenCenterX, screenCenterY,    // スクリーン中央座標
+      zoom.value,                      // ズームレベル
+      panX.value, panY.value           // パン値
     )
     
     contextMenu.value = {
@@ -433,15 +436,31 @@ const addNote = async () => {
     const isPostView = currentViewIndex.value !== -1 && currentPost.value
     
     // メモを画面中央に配置するための座標計算
-    // 画面中央のスクリーン座標
-    const screenCenterX = canvasContainer.value?.clientWidth / 2 || 0
-    const screenCenterY = canvasContainer.value?.clientHeight / 2 || 0
+    // スクリーン中央座標
+    const screenWidth = canvasContainer.value?.clientWidth || 0
+    const screenHeight = canvasContainer.value?.clientHeight || 0
+    const screenCenterX = screenWidth / 2
+    const screenCenterY = screenHeight / 2
     
-    // スクリーン座標をキャンバス座標に変換
-    const canvasX = (screenCenterX - panX.value) / zoom.value
-    const canvasY = (screenCenterY - panY.value) / zoom.value
+    // 画面中央（スクリーン座標で (screenCenterX, screenCenterY)）をキャンバス座標に変換
+    // screenToCanvasの引数：(screenX, screenY, screenCenterX, screenCenterY, zoom, panX, panY)
+    const { x: canvasX, y: canvasY } = screenToCanvas(
+      screenCenterX, screenCenterY,  // スクリーン座標（画面中央）
+      screenCenterX, screenCenterY,  // スクリーン中央座標
+      zoom.value,                     // ズームレベル
+      panX.value, panY.value          // パン値
+    )
     
-    console.log('📍 Adding note at canvas center:', { canvasX, canvasY, zoom: zoom.value, panX: panX.value, panY: panY.value })
+    // 画面中央をキャンバス座標に変換すると、パンの影響を受けるため、
+    // 実際には (0, 0) に配置されるはず
+    // ただし、パンが (0, 0) でない場合は、パンの値だけずれる
+    
+    console.log('📍 Adding note at canvas center:', { 
+      screenCenter: { x: screenCenterX, y: screenCenterY },
+      canvas: { x: canvasX, y: canvasY }, 
+      zoom: zoom.value, 
+      pan: { x: panX.value, y: panY.value } 
+    })
     
     // Supabaseに送信するデータ（必要なカラムのみ）
     const noteDataForDB = {
