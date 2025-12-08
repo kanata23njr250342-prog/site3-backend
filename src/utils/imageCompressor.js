@@ -160,14 +160,8 @@ export async function compressVideo(file) {
     }
   } catch (error) {
     console.error('❌ Video compression failed:', error)
-    // 圧縮失敗時は元ファイルを返す
-    return {
-      compressed: file,
-      original: file,
-      ratio: 0,
-      originalSize: file.size,
-      compressedSize: file.size
-    }
+    // エラーを再スロー（呼び出し元で処理）
+    throw error
   }
 }
 
