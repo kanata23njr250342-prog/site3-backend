@@ -1,16 +1,25 @@
 [build]
 command = "npm run build"
-functions = "netlify/functions"
 publish = "dist"
+# Netlify Functionsは使用していないため削除
+# functions = "netlify/functions"
 
 [build.environment]
 # Supabase environment variables for build time
 # These will be injected into the frontend build
 VITE_SUPABASE_URL = "https://ddkmnuivyvuqqfvktrou.supabase.co"
 VITE_SUPABASE_ANON_KEY = "sb_publishable_RoGIEnAS8977W74YIA5o_g_Ajol_JpW"
+# Node.jsバージョンを明示的に指定（ビルド時間短縮）
+NODE_VERSION = "20"
 
 [dev]
-functions = "netlify/functions"
+# 開発環境ではFunctionsは不要
+# functions = "netlify/functions"
+
+# キャッシング設定（ビルド時間短縮）
+[build.cache]
+# node_modulesをキャッシュ
+cache_dir = "node_modules"
 
 # SPA用のキャッチオールリダイレクト
 # すべてのルートをindex.htmlにリダイレクト
@@ -19,3 +28,14 @@ functions = "netlify/functions"
 from = "/*"
 to = "/index.html"
 status = 200
+
+# キャッシュヘッダーの設定（静的アセットのキャッシュ）
+[[headers]]
+for = "/assets/*"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/index.html"
+[headers.values]
+Cache-Control = "public, max-age=0, must-revalidate"

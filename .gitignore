@@ -30,3 +30,9 @@ data/
 # Environment variables
 .env.local
 .env.*.local
+
+# Netlify cache
+.netlify/
+
+# Build cache
+.cache/
