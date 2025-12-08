@@ -88,3 +88,74 @@ export function shouldCompress(file, thresholdMB = 5) {
   return file.size > thresholdBytes
 }
 
+/**
+ * 画像をWebP形式に変換する
+ * @param {File|Blob} file - 変換対象のファイル
+ * @param {number} quality - 品質（0-1）
+ * @returns {Promise<File>}
+ */
+export async function convertToWebP(file, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.width
+        canvas.height = img.height
+        const ctx = canvas.getContext('2d')
+        ctx.drawImage(img, 0, 0)
+        
+        // WebPに変換
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error('Failed to convert to WebP'))
+              return
+            }
+            
+            const originalName = file.name.replace(/\.[^.]+$/, '')
+            const webpFile = new File([blob], `${originalName}.webp`, {
+              type: 'image/webp'
+            })
+            
+            console.log('✅ Image converted to WebP:', {
+              originalSize: `${(file.size / 1024 / 1024).toFixed(2)}MB`,
+              webpSize: `${(blob.size / 1024 / 1024).toFixed(2)}MB`,
+              reduction: `${((1 - blob.size / file.size) * 100).toFixed(1)}%`
+            })
+            
+            resolve(webpFile)
+          },
+          'image/webp',
+          quality
+        )
+      }
+      img.onerror = () => {
+        reject(new Error('Failed to load image'))
+      }
+      img.src = e.target.result
+    }
+    
+    reader.onerror = () => {
+      reject(new Error('Failed to read file'))
+    }
+    
+    reader.readAsDataURL(file)
+  })
+}
+
+/**
+ * 動画をWebM形式に変換する（将来的な実装用）
+ * 注：ブラウザ側での動画変換は複雑なため、バックエンド側での実装が推奨される
+ * @param {File} file - 変換対象の動画ファイル
+ * @returns {Promise<File>}
+ */
+export async function convertToWebM(file) {
+  // 現在はブラウザ側での動画変換は未実装
+  // バックエンド側でFFmpeg等を使用して実装することを推奨
+  console.warn('⚠️ WebM conversion not implemented on client side')
+  throw new Error('WebM conversion requires backend implementation')
+}
+

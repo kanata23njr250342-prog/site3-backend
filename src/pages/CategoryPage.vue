@@ -12,7 +12,7 @@ import { fetchPosts, createPost, updatePost, deletePost as deletePostApi } from 
 import { loadDeletedExampleNoteIds, saveDeletedExampleNoteIds } from '../utils/storage.js'
 import { screenToCanvas } from '../utils/coordinates.js'
 import { getCurrentUserId, isCurrentUser } from '../utils/auth.js'
-import { compressImage, isFileTooLarge, shouldCompress, formatFileSize } from '../utils/imageCompressor.js'
+import { compressImage, isFileTooLarge, shouldCompress, formatFileSize, convertToWebP } from '../utils/imageCompressor.js'
 
 const router = useRouter()
 const props = defineProps({
@@ -619,7 +619,7 @@ const addPost = async () => {
           maxWidth: 1920,
           maxHeight: 1080
         })
-        postLoadingProgress.value = 75
+        postLoadingProgress.value = 50
         fileToUpload = compressionResult.compressed
         
         console.log(`📊 Compression complete: ${compressionResult.ratio}% reduction`)
@@ -633,7 +633,21 @@ const addPost = async () => {
       }
     }
 
+    // WebP形式に変換
     isPostLoading.value = true
+    postLoadingMessage.value = 'WebP形式に変換中...'
+    postLoadingProgress.value = 60
+    try {
+      console.log('🔄 Converting to WebP...')
+      fileToUpload = await convertToWebP(fileToUpload, 0.8)
+      postLoadingProgress.value = 80
+      console.log('✅ WebP conversion complete')
+    } catch (conversionError) {
+      console.error('❌ WebP conversion failed:', conversionError)
+      isPostLoading.value = false
+      alert('WebP形式への変換に失敗しました。')
+      return
+    }
 
     postLoadingMessage.value = '投稿中...'
     postLoadingProgress.value = 85
