@@ -89,7 +89,7 @@ export function shouldCompress(file, thresholdMB = 5) {
 }
 
 /**
- * 動画ファイルを圧縮する（オンラインAPIを使用）
+ * 動画ファイルを圧縮する（FFmpeg.wasmを使用）
  * @param {File} file - 圧縮対象の動画ファイル
  * @returns {Promise<{compressed: Blob, original: File, ratio: number, originalSize: number, compressedSize: number}>}
  */
@@ -100,36 +100,49 @@ export async function compressVideo(file) {
     type: file.type
   })
 
-  // Cloudinary APIを使用して動画を圧縮
-  // 注：本番環境ではCloudinary APIキーを環境変数から取得する必要があります
-  const cloudinaryUrl = 'https://api.cloudinary.com/v1_1/demo/video/upload'
-
   try {
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('upload_preset', 'demo') // デモプリセット（署名不要）
-    formData.append('quality', 'auto:good') // 自動品質調整
-    formData.append('fetch_format', 'auto') // 最適なフォーマットを自動選択
-    formData.append('resource_type', 'video')
-
-    const response = await fetch(cloudinaryUrl, {
-      method: 'POST',
-      body: formData
-    })
-
-    if (!response.ok) {
-      throw new Error(`Cloudinary API error: ${response.status}`)
+    // FFmpeg.wasmをダイナミックインポート
+    const { FFmpeg, toBlobURL } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.mjs')
+    
+    const ffmpeg = new FFmpeg()
+    
+    // FFmpegの初期化
+    if (!ffmpeg.loaded) {
+      const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm'
+      await ffmpeg.load({
+        coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
+        wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm')
+      })
     }
 
-    const data = await response.json()
+    // ファイルをFFmpegに書き込む
+    const inputFileName = file.name
+    const outputFileName = `compressed_${Date.now()}.mp4`
+    
+    const fileBuffer = await file.arrayBuffer()
+    ffmpeg.writeFile(inputFileName, new Uint8Array(fileBuffer))
 
-    if (!data.secure_url) {
-      throw new Error('Cloudinary returned no URL')
-    }
+    console.log('🔄 Running FFmpeg compression...')
+    
+    // FFmpegコマンドで動画を圧縮
+    // -crf 28: 品質（低いほど高品質、デフォルト23）
+    // -preset fast: エンコード速度（fast, medium, slow）
+    await ffmpeg.exec([
+      '-i', inputFileName,
+      '-crf', '28',
+      '-preset', 'fast',
+      '-c:a', 'aac',
+      '-b:a', '128k',
+      outputFileName
+    ])
 
-    // 圧縮されたファイルをダウンロード
-    const compressedResponse = await fetch(data.secure_url)
-    const compressedBlob = await compressedResponse.blob()
+    // 圧縮されたファイルを読み込む
+    const compressedData = ffmpeg.readFile(outputFileName)
+    const compressedBlob = new Blob([compressedData.buffer], { type: 'video/mp4' })
+
+    // クリーンアップ
+    ffmpeg.deleteFile(inputFileName)
+    ffmpeg.deleteFile(outputFileName)
 
     const originalSize = file.size
     const compressedSize = compressedBlob.size
@@ -138,8 +151,7 @@ export async function compressVideo(file) {
     console.log('✅ Video compressed successfully:', {
       originalSize: `${(originalSize / 1024 / 1024).toFixed(2)}MB`,
       compressedSize: `${(compressedSize / 1024 / 1024).toFixed(2)}MB`,
-      ratio: `${ratio}%`,
-      url: data.secure_url
+      ratio: `${ratio}%`
     })
 
     return {

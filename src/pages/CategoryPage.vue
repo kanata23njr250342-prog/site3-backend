@@ -45,6 +45,8 @@ const deletedExampleNoteIds = ref(new Set())
 const showPostDialog = ref(false)
 const editingPost = ref(null)
 const newPostForm = ref({ title: '', file: null, preview: null })
+const isPostLoading = ref(false)
+const postLoadingMessage = ref('')
 
 // ===== 画像拡大表示 =====
 const expandedImage = ref(null)
@@ -592,6 +594,9 @@ const addPost = async () => {
   }
 
   try {
+    isPostLoading.value = true
+    postLoadingMessage.value = '準備中...'
+
     let fileToUpload = newPostForm.value.file
     const originalSize = fileToUpload.size
     const isVideo = isVideoFile(fileToUpload)
@@ -600,6 +605,7 @@ const addPost = async () => {
     const MAX_FILE_SIZE = 10 * 1024 * 1024
     if (isFileTooLarge(fileToUpload, 10)) {
       console.log('⚠️ File is too large, compression required')
+      isPostLoading.value = false
       const userChoice = confirm(
         `ファイルサイズが大きすぎます（${formatFileSize(originalSize)}）。\n` +
         `圧縮を行いますか？\n\n` +
@@ -607,6 +613,8 @@ const addPost = async () => {
       )
 
       if (userChoice) {
+        isPostLoading.value = true
+        postLoadingMessage.value = isVideo ? '動画を圧縮中...' : '画像を圧縮中...'
         try {
           console.log('🔄 Starting compression...')
           let compressionResult
@@ -631,6 +639,7 @@ const addPost = async () => {
                 `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
         } catch (compressionError) {
           console.error('❌ Compression failed:', compressionError)
+          isPostLoading.value = false
           alert('圧縮に失敗しました。別のファイルを選択してください。')
           return
         }
@@ -642,6 +651,7 @@ const addPost = async () => {
     // 圧縮が推奨される場合（5MB以上10MB未満）
     else if (shouldCompress(fileToUpload, 5)) {
       console.log('💾 File size suggests compression')
+      isPostLoading.value = false
       const userChoice = confirm(
         `ファイルサイズが大きいため、圧縮をお勧めします。\n` +
         `現在: ${formatFileSize(originalSize)}\n\n` +
@@ -649,6 +659,8 @@ const addPost = async () => {
       )
 
       if (userChoice) {
+        isPostLoading.value = true
+        postLoadingMessage.value = isVideo ? '動画を圧縮中...' : '画像を圧縮中...'
         try {
           console.log('🔄 Starting compression...')
           let compressionResult
@@ -673,12 +685,14 @@ const addPost = async () => {
                 `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
         } catch (compressionError) {
           console.error('❌ Compression failed:', compressionError)
+          isPostLoading.value = false
           alert('圧縮に失敗しました。そのまま保存します。')
           // 圧縮失敗時は元ファイルで続行
         }
       }
     }
 
+    postLoadingMessage.value = '投稿中...'
     console.log('📝 Creating FormData with:', {
       title: newPostForm.value.title.trim(),
       category: props.name,
@@ -706,6 +720,9 @@ const addPost = async () => {
   } catch (error) {
     console.error('❌ Error adding post:', error)
     alert(`投稿作品の保存に失敗しました: ${error.message}`)
+  } finally {
+    isPostLoading.value = false
+    postLoadingMessage.value = ''
   }
 }
 
@@ -1078,7 +1095,15 @@ onUnmounted(() => {
     <div v-if="showPostDialog" class="dialog-overlay" @click.self="showPostDialog = false; editingPost = null; newPostForm = { title: '', file: null, preview: null }">
       <div class="dialog">
         <h3 class="dialog-title">{{ editingPost ? '投稿作品を編集' : '投稿作品を追加' }}</h3>
-        <div class="dialog-form">
+        
+        <!-- ローディング表示 -->
+        <div v-if="isPostLoading" class="loading-container">
+          <div class="spinner"></div>
+          <p class="loading-message">{{ postLoadingMessage }}</p>
+        </div>
+        
+        <!-- フォーム（ローディング中は非表示） -->
+        <div v-if="!isPostLoading" class="dialog-form">
           <div class="form-group">
             <label>タイトル</label>
             <input
@@ -1101,7 +1126,9 @@ onUnmounted(() => {
             <video v-else :src="newPostForm.preview" controls />
           </div>
         </div>
-        <div class="dialog-actions">
+        
+        <!-- ボタン（ローディング中は非表示） -->
+        <div v-if="!isPostLoading" class="dialog-actions">
           <button
             class="dialog-btn dialog-btn-cancel"
             @click="showPostDialog = false; editingPost = null; newPostForm = { title: '', file: null, preview: null }"
@@ -1450,6 +1477,42 @@ onUnmounted(() => {
 
 .dialog-btn-submit:hover {
   background: #3d3d3d;
+}
+
+/* ローディング表示 */
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  min-height: 200px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 4px solid #f0f0f0;
+  border-top: 4px solid #545454;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-message {
+  font-size: 1rem;
+  color: #545454;
+  font-weight: 600;
+  margin: 0;
 }
 
 /* 画像拡大表示 */
