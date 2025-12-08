@@ -89,7 +89,9 @@ export function shouldCompress(file, thresholdMB = 5) {
 }
 
 /**
- * 動画ファイルを圧縮する（バックエンド経由でCloudConvert APIを使用）
+ * 動画ファイルを圧縮する
+ * 1. バックエンド側で圧縮を試みる
+ * 2. バックエンド失敗時はCloudConvert APIを直接呼び出す
  * @param {File} file - 圧縮対象の動画ファイル
  * @returns {Promise<{compressed: Blob, original: File, ratio: number, originalSize: number, compressedSize: number}>}
  */
@@ -100,19 +102,18 @@ export async function compressVideo(file) {
     type: file.type
   })
 
+  // ファイルをBase64に変換
+  const fileBuffer = await file.arrayBuffer()
+  const uint8Array = new Uint8Array(fileBuffer)
+  let fileBase64 = ''
+  for (let i = 0; i < uint8Array.length; i++) {
+    fileBase64 += String.fromCharCode(uint8Array[i])
+  }
+  fileBase64 = btoa(fileBase64)
+
+  // Step 1: バックエンド側での圧縮を試みる
+  console.log('📤 Step 1: Trying backend compression...')
   try {
-    // ファイルをBase64に変換
-    const fileBuffer = await file.arrayBuffer()
-    const uint8Array = new Uint8Array(fileBuffer)
-    let fileBase64 = ''
-    for (let i = 0; i < uint8Array.length; i++) {
-      fileBase64 += String.fromCharCode(uint8Array[i])
-    }
-    fileBase64 = btoa(fileBase64)
-
-    console.log('📤 Sending to backend for compression...')
-
-    // バックエンドのcompress-videoエンドポイントを呼び出し
     const response = await fetch('/.netlify/functions/compress-video', {
       method: 'POST',
       headers: {
@@ -124,43 +125,174 @@ export async function compressVideo(file) {
       })
     })
 
-    if (!response.ok) {
-      throw new Error(`Backend error: ${response.status}`)
+    if (response.ok) {
+      const data = await response.json()
+
+      if (data.success && data.ratio > 0) {
+        console.log('✅ Backend compression succeeded')
+        
+        // 圧縮されたBase64をBlobに変換
+        const compressedBuffer = Buffer.from(data.compressedData, 'base64')
+        const compressedBlob = new Blob([compressedBuffer], { type: 'video/mp4' })
+
+        console.log('✅ Video compressed successfully:', {
+          originalSize: `${(data.originalSize / 1024 / 1024).toFixed(2)}MB`,
+          compressedSize: `${(data.compressedSize / 1024 / 1024).toFixed(2)}MB`,
+          ratio: `${data.ratio}%`
+        })
+
+        return {
+          compressed: compressedBlob,
+          original: file,
+          ratio: data.ratio,
+          originalSize: data.originalSize,
+          compressedSize: data.compressedSize
+        }
+      }
     }
+  } catch (error) {
+    console.warn('⚠️ Backend compression failed:', error.message)
+  }
 
-    const data = await response.json()
+  // Step 2: バックエンド失敗時はCloudConvert APIを直接呼び出す
+  console.log('📤 Step 2: Falling back to CloudConvert API...')
+  
+  const cloudConvertApiKey = process.env.VITE_CLOUDCONVERT_API_KEY
+  
+  if (!cloudConvertApiKey) {
+    console.error('❌ CloudConvert API key not found')
+    throw new Error('Video compression not available (no API key)')
+  }
 
-    if (!data.success) {
-      console.warn('⚠️ Video compression not available:', data.message)
-      throw new Error(`Compression failed: ${data.message}`)
-    }
-
-    // 圧縮率が0%の場合はエラー扱い（圧縮が実際に行われていない）
-    if (data.ratio === 0) {
-      console.warn('⚠️ Compression ratio is 0%, treating as failure')
-      throw new Error('Compression did not reduce file size')
-    }
-
-    // 圧縮されたBase64をBlobに変換
-    const compressedBuffer = Buffer.from(data.compressedData, 'base64')
-    const compressedBlob = new Blob([compressedBuffer], { type: 'video/mp4' })
-
-    console.log('✅ Video compressed successfully:', {
-      originalSize: `${(data.originalSize / 1024 / 1024).toFixed(2)}MB`,
-      compressedSize: `${(data.compressedSize / 1024 / 1024).toFixed(2)}MB`,
-      ratio: `${data.ratio}%`
+  try {
+    // CloudConvert Job APIを使用
+    console.log('📝 Creating CloudConvert job...')
+    
+    const jobResponse = await fetch('https://api.cloudconvert.com/v2/jobs', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${cloudConvertApiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        tasks: {
+          'import-my-file': {
+            operation: 'import/base64',
+            file: fileBase64,
+            filename: file.name
+          },
+          'convert-my-file': {
+            operation: 'convert',
+            input: 'import-my-file',
+            output_format: 'mp4',
+            video_codec: 'h264',
+            crf: 28,
+            preset: 'fast'
+          },
+          'export-my-file': {
+            operation: 'export/url',
+            input: 'convert-my-file'
+          }
+        }
+      })
     })
+
+    if (!jobResponse.ok) {
+      const errorText = await jobResponse.text()
+      throw new Error(`CloudConvert job creation failed: ${jobResponse.status} - ${errorText}`)
+    }
+
+    const jobData = await jobResponse.json()
+    const jobId = jobData.data.id
+
+    console.log('✅ Job created:', jobId)
+
+    // ジョブの完了を待つ（ポーリング）
+    console.log('⏳ Waiting for job completion...')
+    let jobStatus = 'processing'
+    let maxAttempts = 60
+    let attempts = 0
+
+    while (jobStatus === 'processing' && attempts < maxAttempts) {
+      await new Promise(resolve => setTimeout(resolve, 5000))
+
+      const statusResponse = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
+        headers: {
+          'Authorization': `Bearer ${cloudConvertApiKey}`
+        }
+      })
+
+      if (!statusResponse.ok) {
+        throw new Error(`Failed to check job status: ${statusResponse.status}`)
+      }
+
+      const statusData = await statusResponse.json()
+      jobStatus = statusData.data.status
+
+      console.log(`📊 Job status: ${jobStatus} (attempt ${attempts + 1}/${maxAttempts})`)
+
+      attempts++
+    }
+
+    if (jobStatus !== 'finished') {
+      throw new Error(`Job did not complete: ${jobStatus}`)
+    }
+
+    console.log('✅ Job completed')
+
+    // 出力ファイルをダウンロード
+    console.log('📥 Fetching final job data...')
+    const finalJobResponse = await fetch(`https://api.cloudconvert.com/v2/jobs/${jobId}`, {
+      headers: {
+        'Authorization': `Bearer ${cloudConvertApiKey}`
+      }
+    })
+
+    if (!finalJobResponse.ok) {
+      throw new Error(`Failed to fetch final job data: ${finalJobResponse.status}`)
+    }
+
+    const finalJobData = await finalJobResponse.json()
+    const exportTask = finalJobData.data.tasks.find(t => t.name === 'export-my-file')
+
+    if (!exportTask || !exportTask.result || !exportTask.result.files || exportTask.result.files.length === 0) {
+      throw new Error('No output file found in job result')
+    }
+
+    const downloadUrl = exportTask.result.files[0].url
+
+    console.log('📥 Downloading compressed video...')
+
+    const downloadResponse = await fetch(downloadUrl)
+
+    if (!downloadResponse.ok) {
+      throw new Error(`Download failed: ${downloadResponse.status}`)
+    }
+
+    const compressedBuffer = await downloadResponse.arrayBuffer()
+    const compressedBase64 = Buffer.from(compressedBuffer).toString('base64')
+    
+    const originalSize = Buffer.byteLength(fileBase64, 'base64')
+    const compressedSize = Buffer.byteLength(compressedBase64, 'base64')
+    const ratio = ((1 - compressedSize / originalSize) * 100).toFixed(1)
+
+    console.log('✅ Video compressed successfully via CloudConvert:', {
+      originalSize: `${(originalSize / 1024 / 1024).toFixed(2)}MB`,
+      compressedSize: `${(compressedSize / 1024 / 1024).toFixed(2)}MB`,
+      ratio: `${ratio}%`
+    })
+
+    const compressedBlob = new Blob([Buffer.from(compressedBase64, 'base64')], { type: 'video/mp4' })
 
     return {
       compressed: compressedBlob,
       original: file,
-      ratio: data.ratio,
-      originalSize: data.originalSize,
-      compressedSize: data.compressedSize
+      ratio: parseFloat(ratio),
+      originalSize,
+      compressedSize
     }
   } catch (error) {
-    console.error('❌ Video compression failed:', error)
-    // エラーを再スロー（呼び出し元で処理）
+    console.error('❌ CloudConvert compression failed:', error)
     throw error
   }
 }
