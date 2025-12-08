@@ -30,10 +30,6 @@ const dragStartY = ref(0)
 const rightClickStartTime = ref(0)
 const rightClickStartX = ref(0)
 const rightClickStartY = ref(0)
-const isRightClickDragging = ref(false)
-const rightClickStartZoom = ref(1)
-const rightClickStartPanX = ref(0)
-const rightClickStartPanY = ref(0)
 
 // 中ボタンスクロール用
 let wheelStartZoom = 1
@@ -271,15 +267,11 @@ const handleCanvasMouseDown = (e) => {
     dragStartX.value = e.clientX
     dragStartY.value = e.clientY
   } else if (e.button === 2) {
-    // 右クリック: ズーム準備（ドラッグで確定）
+    // 右クリック: コンテキストメニュー準備
     e.preventDefault()
     rightClickStartTime.value = Date.now()
     rightClickStartX.value = e.clientX
     rightClickStartY.value = e.clientY
-    rightClickStartZoom.value = zoom.value
-    rightClickStartPanX.value = panX.value
-    rightClickStartPanY.value = panY.value
-    isRightClickDragging.value = false
   }
 }
 
@@ -291,50 +283,13 @@ const handleCanvasMouseMove = (e) => {
     panY.value += deltaY
     dragStartX.value = e.clientX
     dragStartY.value = e.clientY
-  } else if (rightClickStartTime.value > 0) {
-    // 右クリック長押し中のドラッグ判定
-    const deltaX = Math.abs(e.clientX - rightClickStartX.value)
-    const deltaY = Math.abs(e.clientY - rightClickStartY.value)
-    
-    if (deltaX > 5 || deltaY > 5) {
-      // ドラッグが開始された
-      isRightClickDragging.value = true
-      
-      // スクロール開始位置からの累積Y移動距離
-      const cumulativeDeltaY = e.clientY - rightClickStartY.value
-      
-      // 累積移動距離に基づいてズームレベルを計算
-      const zoomChangePerPixel = 0.001
-      const targetZoom = rightClickStartZoom.value * Math.exp(-cumulativeDeltaY * zoomChangePerPixel)
-      
-      if (targetZoom >= 0.5 && targetZoom <= 5) {
-        // 右クリックズーム: 画面の中心を基準にズーム
-        const canvasRect = canvasContainer.value?.getBoundingClientRect()
-        if (canvasRect) {
-          const centerX = canvasRect.width / 2
-          const centerY = canvasRect.height / 2
-          
-          // 画面中心のキャンバス座標を計算（開始時のズーム/パンで）
-          const centerCanvasX = (0 - rightClickStartPanX.value) / rightClickStartZoom.value
-          const centerCanvasY = (0 - rightClickStartPanY.value) / rightClickStartZoom.value
-          
-          // 画面中心が同じキャンバス座標を指すようにパンを計算
-          const newPanX = -centerCanvasX * targetZoom
-          const newPanY = -centerCanvasY * targetZoom
-          
-          panX.value = newPanX
-          panY.value = newPanY
-          zoom.value = targetZoom
-        }
-      }
-    }
   }
 }
 
 const handleCanvasMouseUp = (e) => {
   if (isDragging.value) {
     isDragging.value = false
-  } else if (rightClickStartTime.value > 0 && !isRightClickDragging.value) {
+  } else if (rightClickStartTime.value > 0) {
     // 右クリックで長押しもドラッグもしなかった場合: コンテキストメニュー表示
     const canvasContainer_rect = canvasContainer.value?.getBoundingClientRect()
     if (!canvasContainer_rect) {
@@ -368,7 +323,6 @@ const handleCanvasMouseUp = (e) => {
   }
   
   rightClickStartTime.value = 0
-  isRightClickDragging.value = false
 }
 
 const handleCanvasWheel = (e) => {
@@ -399,14 +353,17 @@ const handleCanvasWheel = (e) => {
   
   if (targetZoom >= 0.5 && targetZoom <= 5) {
     // カーソル位置のキャンバス座標を計算（開始時のズーム/パンで）
-    const cursorCanvasX = (cursorScreenX - centerX - wheelStartPanX) / wheelStartZoom
-    const cursorCanvasY = (cursorScreenY - centerY - wheelStartPanY) / wheelStartZoom
+    // screenToCanvasと同じロジック
+    const relativeX = cursorScreenX - centerX
+    const relativeY = cursorScreenY - centerY
+    const cursorCanvasX = (relativeX - wheelStartPanX) / wheelStartZoom
+    const cursorCanvasY = (relativeY - wheelStartPanY) / wheelStartZoom
     
     // 新しいズームで同じキャンバス座標がカーソル位置に来るようにパンを計算
-    // cursorScreenX - centerX = cursorCanvasX * targetZoom + newPanX
-    // newPanX = cursorScreenX - centerX - cursorCanvasX * targetZoom
-    const newPanX = cursorScreenX - centerX - cursorCanvasX * targetZoom
-    const newPanY = cursorScreenY - centerY - cursorCanvasY * targetZoom
+    // relativeX = cursorCanvasX * targetZoom + newPanX
+    // newPanX = relativeX - cursorCanvasX * targetZoom
+    const newPanX = relativeX - cursorCanvasX * targetZoom
+    const newPanY = relativeY - cursorCanvasY * targetZoom
     
     panX.value = newPanX
     panY.value = newPanY
@@ -930,7 +887,7 @@ onUnmounted(() => {
         <div
           class="canvas-content"
           :style="{
-            transform: `scale(${zoom}) translate(${panX}px, ${panY}px)`
+            transform: `translate(${panX}px, ${panY}px) scale(${zoom})`
           }"
         >
           <!-- 作品表示 -->
