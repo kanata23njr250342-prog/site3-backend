@@ -157,10 +157,13 @@ export async function compressVideo(file) {
   // Step 2: バックエンド失敗時はCloudConvert APIを直接呼び出す
   console.log('📤 Step 2: Falling back to CloudConvert API...')
   
-  const cloudConvertApiKey = process.env.VITE_CLOUDCONVERT_API_KEY
+  const cloudConvertApiKey = import.meta.env.VITE_CLOUDCONVERT_API_KEY
+  
+  console.log('🔑 CloudConvert API key check:', cloudConvertApiKey ? '✅ found' : '❌ not found')
   
   if (!cloudConvertApiKey) {
-    console.error('❌ CloudConvert API key not found')
+    console.error('❌ CloudConvert API key not found in environment')
+    console.error('📋 Available env vars:', Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')))
     throw new Error('Video compression not available (no API key)')
   }
 
