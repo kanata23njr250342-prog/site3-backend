@@ -639,9 +639,8 @@ const addPost = async () => {
                 `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
         } catch (compressionError) {
           console.error('❌ Compression failed:', compressionError)
-          isPostLoading.value = false
-          alert('圧縮に失敗しました。別のファイルを選択してください。')
-          return
+          alert('圧縮に失敗しました。元のファイルで投稿を続行します。')
+          // 圧縮失敗時は元ファイルで続行（ローディング表示は継続）
         }
       } else {
         console.log('❌ User cancelled compression')
@@ -685,9 +684,8 @@ const addPost = async () => {
                 `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
         } catch (compressionError) {
           console.error('❌ Compression failed:', compressionError)
-          isPostLoading.value = false
-          alert('圧縮に失敗しました。そのまま保存します。')
-          // 圧縮失敗時は元ファイルで続行
+          alert('圧縮に失敗しました。元のファイルで投稿を続行します。')
+          // 圧縮失敗時は元ファイルで続行（ローディング表示は継続）
         }
       }
     }
