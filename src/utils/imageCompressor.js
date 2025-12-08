@@ -160,6 +160,10 @@ export async function compressVideo(file) {
   const cloudConvertApiKey = import.meta.env.VITE_CLOUDCONVERT_API_KEY
   
   console.log('🔑 CloudConvert API key check:', cloudConvertApiKey ? '✅ found' : '❌ not found')
+  if (cloudConvertApiKey) {
+    console.log('🔑 API key length:', cloudConvertApiKey.length)
+    console.log('🔑 API key first 20 chars:', cloudConvertApiKey.substring(0, 20) + '...')
+  }
   
   if (!cloudConvertApiKey) {
     console.error('❌ CloudConvert API key not found in environment')
@@ -170,6 +174,42 @@ export async function compressVideo(file) {
   try {
     // CloudConvert Job APIを使用
     console.log('📝 Creating CloudConvert job...')
+    console.log('📋 Request details:')
+    console.log('  - URL: https://api.cloudconvert.com/v2/jobs')
+    console.log('  - Method: POST')
+    console.log('  - Authorization: Bearer [API_KEY]')
+    console.log('  - Content-Type: application/json')
+    console.log('  - File name:', file.name)
+    console.log('  - File size (Base64):', fileBase64.length, 'chars')
+    
+    const jobPayload = {
+      tasks: {
+        'import-my-file': {
+          operation: 'import/base64',
+          file: fileBase64,
+          filename: file.name
+        },
+        'convert-my-file': {
+          operation: 'convert',
+          input: 'import-my-file',
+          output_format: 'mp4',
+          video_codec: 'h264',
+          crf: 28,
+          preset: 'fast'
+        },
+        'export-my-file': {
+          operation: 'export/url',
+          input: 'convert-my-file'
+        }
+      }
+    }
+    
+    console.log('📦 Payload structure:', JSON.stringify({
+      tasks: Object.keys(jobPayload.tasks).map(k => ({
+        name: k,
+        operation: jobPayload.tasks[k].operation
+      }))
+    }))
     
     const jobResponse = await fetch('https://api.cloudconvert.com/v2/jobs', {
       method: 'POST',
@@ -177,31 +217,18 @@ export async function compressVideo(file) {
         'Authorization': `Bearer ${cloudConvertApiKey}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        tasks: {
-          'import-my-file': {
-            operation: 'import/base64',
-            file: fileBase64,
-            filename: file.name
-          },
-          'convert-my-file': {
-            operation: 'convert',
-            input: 'import-my-file',
-            output_format: 'mp4',
-            video_codec: 'h264',
-            crf: 28,
-            preset: 'fast'
-          },
-          'export-my-file': {
-            operation: 'export/url',
-            input: 'convert-my-file'
-          }
-        }
-      })
+      body: JSON.stringify(jobPayload)
+    })
+
+    console.log('📥 Response status:', jobResponse.status)
+    console.log('📥 Response headers:', {
+      'content-type': jobResponse.headers.get('content-type'),
+      'x-ratelimit-remaining': jobResponse.headers.get('x-ratelimit-remaining')
     })
 
     if (!jobResponse.ok) {
       const errorText = await jobResponse.text()
+      console.error('❌ CloudConvert API error response:', errorText)
       throw new Error(`CloudConvert job creation failed: ${jobResponse.status} - ${errorText}`)
     }
 
