@@ -616,12 +616,18 @@ const addPost = async () => {
           
           fileToUpload = compressionResult.compressed
           console.log(`📊 Compression complete: ${compressionResult.ratio}% reduction`)
-          alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
-                `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
+          
+          // 圧縮率が0の場合（圧縮スキップ）
+          if (compressionResult.ratio === 0) {
+            alert(`圧縮をスキップしました。\n元のファイルサイズ: ${formatFileSize(compressionResult.originalSize)}\n\n※ 動画圧縮機能が利用できない環境の可能性があります`)
+          } else {
+            alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
+                  `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
+          }
         } catch (compressionError) {
           console.error('❌ Compression failed:', compressionError)
-          alert('圧縮に失敗しました。別のファイルを選択してください。')
-          return
+          alert('圧縮に失敗しました。そのまま保存します。')
+          // 圧縮失敗時は元ファイルで続行
         }
       } else {
         console.log('❌ User cancelled compression')
@@ -648,8 +654,14 @@ const addPost = async () => {
           
           fileToUpload = compressionResult.compressed
           console.log(`📊 Compression complete: ${compressionResult.ratio}% reduction`)
-          alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
-                `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
+          
+          // 圧縮率が0の場合（圧縮スキップ）
+          if (compressionResult.ratio === 0) {
+            alert(`圧縮をスキップしました。\n元のファイルサイズ: ${formatFileSize(compressionResult.originalSize)}\n\n※ 動画圧縮機能が利用できない環境の可能性があります`)
+          } else {
+            alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
+                  `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
+          }
         } catch (compressionError) {
           console.error('❌ Compression failed:', compressionError)
           alert('圧縮に失敗しました。そのまま保存します。')

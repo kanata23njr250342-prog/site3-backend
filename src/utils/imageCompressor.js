@@ -84,33 +84,12 @@ async function compressVideo(file, options = {}) {
   })
 
   try {
-    // FFmpeg.wasmをスクリプトタグで動的に読み込む
-    const FFmpeg = window.FFmpeg?.FFmpeg
-    const fetchFile = window.FFmpeg?.fetchFile
-
-    if (!FFmpeg || !fetchFile) {
-      console.log('⏳ Loading FFmpeg libraries...')
-      
-      // FFmpeg coreスクリプトを読み込む
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script')
-        script.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/ffmpeg-core.js'
-        script.onload = resolve
-        script.onerror = reject
-        document.head.appendChild(script)
-      })
-
-      // FFmpegメインスクリプトを読み込む
-      await new Promise((resolve, reject) => {
-        const script = document.createElement('script')
-        script.src = 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/ffmpeg.min.js'
-        script.onload = resolve
-        script.onerror = reject
-        document.head.appendChild(script)
-      })
-    }
-
-    const ffmpeg = new window.FFmpeg.FFmpeg()
+    console.log('⏳ Loading FFmpeg via import...')
+    
+    // FFmpeg.wasmをES6 importで読み込む
+    const { FFmpeg, fetchFile } = await import('https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/+esm')
+    
+    const ffmpeg = new FFmpeg()
     
     // FFmpegの初期化
     if (!ffmpeg.isLoaded()) {
@@ -173,7 +152,16 @@ async function compressVideo(file, options = {}) {
     }
   } catch (error) {
     console.error('❌ Video compression failed:', error)
-    throw new Error(`動画の圧縮に失敗しました: ${error.message}`)
+    // FFmpeg読み込み失敗時は元ファイルを返す（圧縮スキップ）
+    console.warn('⚠️ Video compression skipped, using original file')
+    const originalSize = file.size
+    return {
+      compressed: file,
+      original: file,
+      ratio: 0,
+      originalSize,
+      compressedSize: originalSize
+    }
   }
 }
 
