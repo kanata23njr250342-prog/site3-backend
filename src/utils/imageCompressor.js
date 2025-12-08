@@ -132,14 +132,13 @@ export async function compressVideo(file) {
 
     if (!data.success) {
       console.warn('⚠️ Video compression not available:', data.message)
-      // 圧縮失敗時は元ファイルを返す
-      return {
-        compressed: file,
-        original: file,
-        ratio: 0,
-        originalSize: file.size,
-        compressedSize: file.size
-      }
+      throw new Error(`Compression failed: ${data.message}`)
+    }
+
+    // 圧縮率が0%の場合はエラー扱い（圧縮が実際に行われていない）
+    if (data.ratio === 0) {
+      console.warn('⚠️ Compression ratio is 0%, treating as failure')
+      throw new Error('Compression did not reduce file size')
     }
 
     // 圧縮されたBase64をBlobに変換
