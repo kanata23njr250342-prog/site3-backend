@@ -32,10 +32,7 @@ const rightClickStartX = ref(0)
 const rightClickStartY = ref(0)
 
 // 中ボタンスクロール用
-let wheelStartZoom = 1
-let wheelStartPanX = 0
-let wheelStartPanY = 0
-let wheelCumulativeDelta = 0
+let wheelTimeoutId = null
 
 // ===== データ状態 =====
 const notes = ref([])
@@ -337,31 +334,18 @@ const handleCanvasWheel = (e) => {
   const centerX = canvasRect.width / 2
   const centerY = canvasRect.height / 2
   
-  // スクロール開始時の値を記録（最初のスクロール時のみ）
-  if (wheelCumulativeDelta === 0) {
-    wheelStartZoom = zoom.value
-    wheelStartPanX = panX.value
-    wheelStartPanY = panY.value
-  }
+  // ズーム計算（シンプル版：各ホイールイベントで直接計算）
+  const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1
+  const targetZoom = Math.min(5, Math.max(0.5, zoom.value * zoomFactor))
   
-  // 累積スクロール量を更新
-  wheelCumulativeDelta += e.deltaY
-  
-  // 累積スクロール量に基づいてズームレベルを計算
-  const zoomChangePerPixel = 0.001
-  const targetZoom = wheelStartZoom * Math.exp(-wheelCumulativeDelta * zoomChangePerPixel)
-  
-  if (targetZoom >= 0.5 && targetZoom <= 5) {
-    // カーソル位置のキャンバス座標を計算（開始時のズーム/パンで）
-    // screenToCanvasと同じロジック
+  if (targetZoom !== zoom.value) {
+    // カーソル位置のキャンバス座標を計算（現在のズーム/パンで）
     const relativeX = cursorScreenX - centerX
     const relativeY = cursorScreenY - centerY
-    const cursorCanvasX = (relativeX - wheelStartPanX) / wheelStartZoom
-    const cursorCanvasY = (relativeY - wheelStartPanY) / wheelStartZoom
+    const cursorCanvasX = (relativeX - panX.value) / zoom.value
+    const cursorCanvasY = (relativeY - panY.value) / zoom.value
     
     // 新しいズームで同じキャンバス座標がカーソル位置に来るようにパンを計算
-    // relativeX = cursorCanvasX * targetZoom + newPanX
-    // newPanX = relativeX - cursorCanvasX * targetZoom
     const newPanX = relativeX - cursorCanvasX * targetZoom
     const newPanY = relativeY - cursorCanvasY * targetZoom
     
@@ -369,11 +353,6 @@ const handleCanvasWheel = (e) => {
     panY.value = newPanY
     zoom.value = targetZoom
   }
-  
-  // スクロール終了時に累積値をリセット（スクロール停止を検出）
-  setTimeout(() => {
-    wheelCumulativeDelta = 0
-  }, 150)
 }
 
 // ===== メモ操作 =====
