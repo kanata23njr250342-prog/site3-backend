@@ -73,7 +73,7 @@ export async function createNote(noteData) {
     console.log('📝 Creating note in Supabase:', noteData)
     
     // Supabaseのカラムに合わせてフィールドを抽出
-    // 色とサイズはSupabaseに保存して、離脱後も保持できるようにする
+    // 色、サイズ、作成者名はSupabaseに保存して、離脱後も保持できるようにする
     const dataForDB = {
       category: noteData.category,
       content: noteData.content,
@@ -84,7 +84,8 @@ export async function createNote(noteData) {
       authorid: getCurrentUserId(),
       color: noteData.color,  // 投稿時の色を保存
       width: noteData.width || 200,  // サイズを保存
-      height: noteData.height || 200
+      height: noteData.height || 200,
+      author: noteData.author || '匿名'  // 作成者名を保存
     }
     
     console.log('📤 Sending to Supabase:', dataForDB)
