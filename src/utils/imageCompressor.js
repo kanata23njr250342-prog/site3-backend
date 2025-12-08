@@ -89,8 +89,7 @@ export function shouldCompress(file, thresholdMB = 5) {
 }
 
 /**
- * 動画ファイルを圧縮する（オンラインサービスを使用）
- * 注：動画圧縮は複雑なため、圧縮失敗時は元ファイルで続行
+ * 動画ファイルを圧縮する（バックエンド経由でCloudConvert APIを使用）
  * @param {File} file - 圧縮対象の動画ファイル
  * @returns {Promise<{compressed: Blob, original: File, ratio: number, originalSize: number, compressedSize: number}>}
  */
@@ -102,23 +101,67 @@ export async function compressVideo(file) {
   })
 
   try {
-    // 動画圧縮はサーバー側で処理するか、オンラインサービスを使用することを推奨
-    // ここではダミー実装として、元ファイルをそのまま返す
-    // 実際の圧縮が必要な場合は、バックエンド側で実装するか、
-    // 専用のオンラインAPIサービスを使用してください
-    
-    console.log('⚠️ Video compression not available, using original file')
-    
+    // ファイルをBase64に変換
+    const fileBuffer = await file.arrayBuffer()
+    const uint8Array = new Uint8Array(fileBuffer)
+    let fileBase64 = ''
+    for (let i = 0; i < uint8Array.length; i++) {
+      fileBase64 += String.fromCharCode(uint8Array[i])
+    }
+    fileBase64 = btoa(fileBase64)
+
+    console.log('📤 Sending to backend for compression...')
+
+    // バックエンドのcompress-videoエンドポイントを呼び出し
+    const response = await fetch('/.netlify/functions/compress-video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fileData: fileBase64,
+        fileName: file.name
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`Backend error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!data.success) {
+      console.warn('⚠️ Video compression not available:', data.message)
+      // 圧縮失敗時は元ファイルを返す
+      return {
+        compressed: file,
+        original: file,
+        ratio: 0,
+        originalSize: file.size,
+        compressedSize: file.size
+      }
+    }
+
+    // 圧縮されたBase64をBlobに変換
+    const compressedBuffer = Buffer.from(data.compressedData, 'base64')
+    const compressedBlob = new Blob([compressedBuffer], { type: 'video/mp4' })
+
+    console.log('✅ Video compressed successfully:', {
+      originalSize: `${(data.originalSize / 1024 / 1024).toFixed(2)}MB`,
+      compressedSize: `${(data.compressedSize / 1024 / 1024).toFixed(2)}MB`,
+      ratio: `${data.ratio}%`
+    })
+
     return {
-      compressed: file,
+      compressed: compressedBlob,
       original: file,
-      ratio: 0,
-      originalSize: file.size,
-      compressedSize: file.size
+      ratio: data.ratio,
+      originalSize: data.originalSize,
+      compressedSize: data.compressedSize
     }
   } catch (error) {
     console.error('❌ Video compression failed:', error)
-    // 圧縮失敗時も元ファイルを返す
+    // 圧縮失敗時は元ファイルを返す
     return {
       compressed: file,
       original: file,
