@@ -12,7 +12,7 @@ import { fetchPosts, createPost, updatePost, deletePost as deletePostApi } from 
 import { loadDeletedExampleNoteIds, saveDeletedExampleNoteIds } from '../utils/storage.js'
 import { screenToCanvas } from '../utils/coordinates.js'
 import { getCurrentUserId, isCurrentUser } from '../utils/auth.js'
-import { compressImage, compressVideo, isFileTooLarge, shouldCompress, formatFileSize, isVideoFile, isImageFile } from '../utils/imageCompressor.js'
+import { compressImage, isFileTooLarge, shouldCompress, formatFileSize } from '../utils/imageCompressor.js'
 
 const router = useRouter()
 const props = defineProps({
@@ -595,111 +595,45 @@ const addPost = async () => {
   }
 
   try {
-    isPostLoading.value = true
-    postLoadingMessage.value = '準備中...'
-
     let fileToUpload = newPostForm.value.file
     const originalSize = fileToUpload.size
-    const isVideo = isVideoFile(fileToUpload)
 
     // ファイルサイズチェック（最大10MB）
-    const MAX_FILE_SIZE = 10 * 1024 * 1024
     if (isFileTooLarge(fileToUpload, 10)) {
-      console.log('⚠️ File is too large, compression required')
-      isPostLoading.value = false
-      const userChoice = confirm(
-        `ファイルサイズが大きすぎます（${formatFileSize(originalSize)}）。\n` +
-        `圧縮を行いますか？\n\n` +
-        `圧縮すると品質が若干低下しますが、アップロード可能になります。`
-      )
+      console.log('⚠️ File is too large')
+      alert('ファイルサイズが大きすぎます。')
+      return
+    }
 
-      if (userChoice) {
-        isPostLoading.value = true
-        postLoadingMessage.value = isVideo ? '動画を圧縮中...' : '画像を圧縮中...'
-        postLoadingProgress.value = 0
-        try {
-          console.log('🔄 Starting compression...')
-          let compressionResult
-          
-          if (isVideo) {
-            // 動画の圧縮
-            postLoadingProgress.value = 25
-            compressionResult = await compressVideo(fileToUpload)
-            postLoadingProgress.value = 75
-            // Blobをファイルに変換
-            fileToUpload = new File([compressionResult.compressed], fileToUpload.name, { type: fileToUpload.type })
-          } else {
-            // 画像の圧縮
-            postLoadingProgress.value = 25
-            compressionResult = await compressImage(fileToUpload, {
-              quality: 0.8,
-              maxWidth: 1920,
-              maxHeight: 1080
-            })
-            postLoadingProgress.value = 75
-            fileToUpload = compressionResult.compressed
-          }
-          
-          console.log(`📊 Compression complete: ${compressionResult.ratio}% reduction`)
-          alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
-                `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
-        } catch (compressionError) {
-          console.error('❌ Compression failed:', compressionError)
-          alert('圧縮に失敗しました。元のファイルで投稿を続行します。')
-          // 圧縮失敗時は元ファイルで続行（ローディング表示は継続）
-        }
-      } else {
-        console.log('❌ User cancelled compression')
+    // 圧縮が推奨される場合（5MB以上10MB未満）
+    if (shouldCompress(fileToUpload, 5)) {
+      console.log('💾 File size suggests compression')
+      isPostLoading.value = true
+      postLoadingMessage.value = '画像を圧縮中...'
+      postLoadingProgress.value = 0
+      try {
+        console.log('🔄 Starting compression...')
+        postLoadingProgress.value = 25
+        const compressionResult = await compressImage(fileToUpload, {
+          quality: 0.8,
+          maxWidth: 1920,
+          maxHeight: 1080
+        })
+        postLoadingProgress.value = 75
+        fileToUpload = compressionResult.compressed
+        
+        console.log(`📊 Compression complete: ${compressionResult.ratio}% reduction`)
+        alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
+              `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
+      } catch (compressionError) {
+        console.error('❌ Compression failed:', compressionError)
+        isPostLoading.value = false
+        alert('圧縮に失敗しました。')
         return
       }
     }
-    // 圧縮が推奨される場合（5MB以上10MB未満）
-    else if (shouldCompress(fileToUpload, 5)) {
-      console.log('💾 File size suggests compression')
-      isPostLoading.value = false
-      const userChoice = confirm(
-        `ファイルサイズが大きいため、圧縮をお勧めします。\n` +
-        `現在: ${formatFileSize(originalSize)}\n\n` +
-        `圧縮しますか？（品質は若干低下します）`
-      )
 
-      if (userChoice) {
-        isPostLoading.value = true
-        postLoadingMessage.value = isVideo ? '動画を圧縮中...' : '画像を圧縮中...'
-        postLoadingProgress.value = 0
-        try {
-          console.log('🔄 Starting compression...')
-          let compressionResult
-          
-          if (isVideo) {
-            // 動画の圧縮
-            postLoadingProgress.value = 25
-            compressionResult = await compressVideo(fileToUpload)
-            postLoadingProgress.value = 75
-            // Blobをファイルに変換
-            fileToUpload = new File([compressionResult.compressed], fileToUpload.name, { type: fileToUpload.type })
-          } else {
-            // 画像の圧縮
-            postLoadingProgress.value = 25
-            compressionResult = await compressImage(fileToUpload, {
-              quality: 0.8,
-              maxWidth: 1920,
-              maxHeight: 1080
-            })
-            postLoadingProgress.value = 75
-            fileToUpload = compressionResult.compressed
-          }
-          
-          console.log(`📊 Compression complete: ${compressionResult.ratio}% reduction`)
-          alert(`圧縮完了！\n圧縮率: ${compressionResult.ratio}%\n` +
-                `${formatFileSize(compressionResult.originalSize)} → ${formatFileSize(compressionResult.compressedSize)}`)
-        } catch (compressionError) {
-          console.error('❌ Compression failed:', compressionError)
-          alert('圧縮に失敗しました。元のファイルで投稿を続行します。')
-          // 圧縮失敗時は元ファイルで続行（ローディング表示は継続）
-        }
-      }
-    }
+    isPostLoading.value = true
 
     postLoadingMessage.value = '投稿中...'
     postLoadingProgress.value = 85
