@@ -11,7 +11,8 @@ export default defineConfig({
       compress: {
         drop_console: true, // console.logを削除
         drop_debugger: true
-      }
+      },
+      mangle: true
     },
     // チャンク分割の最適化
     rollupOptions: {
@@ -26,7 +27,9 @@ export default defineConfig({
     // ビルド時のレポート
     reportCompressedSize: false,
     // ソースマップを本番環境では無効化
-    sourcemap: false
+    sourcemap: false,
+    // チャンク分割の閾値
+    chunkSizeWarningLimit: 500
   },
   // 開発環境の最適化
   server: {
