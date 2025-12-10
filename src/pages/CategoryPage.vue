@@ -41,6 +41,7 @@ const showNoteDialog = ref(false)
 const editingNote = ref(null)
 const newNoteForm = ref({ author: '', content: '' })
 const deletedExampleNoteIds = ref(new Set())
+const isLoadingNotes = ref(false)
 
 const showPostDialog = ref(false)
 const editingPost = ref(null)
@@ -48,6 +49,7 @@ const newPostForm = ref({ title: '', file: null, preview: null })
 const isPostLoading = ref(false)
 const postLoadingMessage = ref('')
 const postLoadingProgress = ref(0)
+const isLoadingPosts = ref(false)
 
 // ===== 画像拡大表示 =====
 const expandedImage = ref(null)
@@ -805,6 +807,8 @@ onMounted(async () => {
 
     deletedExampleNoteIds.value = loadDeletedExampleNoteIds()
 
+    // ノートのローディングを開始
+    isLoadingNotes.value = true
     let backendNotes = []
     try {
       const fetchedNotes = await fetchNotes(props.name)
@@ -821,6 +825,8 @@ onMounted(async () => {
       }))
     } catch (error) {
       console.error('Failed to fetch notes:', error)
+    } finally {
+      isLoadingNotes.value = false
     }
 
     const exampleNotes = (exampleNotesByCategory[props.name] || [])
@@ -840,6 +846,8 @@ onMounted(async () => {
 
     notes.value = [...exampleNotes, ...backendNotes]
 
+    // 投稿のローディングを開始
+    isLoadingPosts.value = true
     try {
       const posts = await fetchPosts(props.name)
       postsByCategory.value[props.name] = posts.map(post => ({
@@ -848,6 +856,8 @@ onMounted(async () => {
       }))
     } catch (error) {
       console.error('Failed to load posts:', error)
+    } finally {
+      isLoadingPosts.value = false
     }
   } catch (error) {
     console.error('Error in onMounted:', error)
@@ -946,6 +956,7 @@ onUnmounted(() => {
       <FloatingPostsList
         :posts="displayedPosts"
         :current-view-index="currentViewIndex"
+        :is-loading="isLoadingPosts"
         @view-post="viewPost"
         @add-post="showPostDialog = true"
         @edit-post="editPost"

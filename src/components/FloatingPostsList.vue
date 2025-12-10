@@ -4,6 +4,7 @@
  * @component
  */
 import { ref, computed } from 'vue'
+import SkeletonLoader from './SkeletonLoader.vue'
 
 const props = defineProps({
   posts: {
@@ -13,6 +14,10 @@ const props = defineProps({
   currentViewIndex: {
     type: Number,
     default: -1
+  },
+  isLoading: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -152,9 +157,18 @@ const contentStyle = computed(() => ({
 
     <!-- ウィンドウコンテンツ -->
     <div class="window-content" :style="contentStyle">
-      <div v-if="posts.length === 0" class="empty-state">
+      <!-- ローディング状態 -->
+      <div v-if="isLoading" class="loading-state">
+        <div v-for="i in 3" :key="`skeleton-${i}`" class="skeleton-post-item">
+          <SkeletonLoader type="text" />
+          <SkeletonLoader type="text" style="width: 60%; margin-top: 8px;" />
+        </div>
+      </div>
+      <!-- 空状態 -->
+      <div v-else-if="posts.length === 0" class="empty-state">
         投稿作品がありません
       </div>
+      <!-- 投稿リスト -->
       <ul v-else class="posts-list">
         <li
           v-for="post in posts"
@@ -418,5 +432,28 @@ const contentStyle = computed(() => ({
 
 .window-content::-webkit-scrollbar-thumb:hover {
   background: #b0b0b0;
+}
+
+/* ローディング状態 */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0.75rem;
+}
+
+.skeleton-post-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0.75rem;
+  background: #f5f5f5;
+  border-radius: 8px;
+  border-left: 4px solid #e0e0e0;
+}
+
+.skeleton-post-item :deep(.skeleton-loader) {
+  height: 16px;
+  border-radius: 4px;
 }
 </style>
